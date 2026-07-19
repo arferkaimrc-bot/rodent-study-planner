@@ -1,0 +1,217 @@
+<!-- ============================================================================
+     DRUG ASSESSMENT SECTION - Add this to your index.html
+     Place this AFTER your study groups section and BEFORE the export buttons
+     ============================================================================ -->
+
+<section class="drug-assessment-section" style="margin-top: 40px; padding: 30px; background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border-radius: 12px; border: 3px solid #22c55e;">
+    
+    <!-- Section Header -->
+    <div style="text-align: center; margin-bottom: 30px;">
+        <h2 style="margin: 0 0 10px 0; color: #15803d; font-size: 28px; display: flex; align-items: center; justify-content: center; gap: 12px;">
+            <span style="font-size: 36px;">🧪</span>
+            <span>Advanced Drug Assessment</span>
+        </h2>
+        <p style="margin: 0; color: #166534; font-size: 16px;">
+            Get comprehensive toxicity, efficacy, and pharmacokinetic predictions
+        </p>
+    </div>
+
+    <!-- Input Form -->
+    <div style="max-width: 800px; margin: 0 auto 30px auto; background: white; padding: 25px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+        
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+            
+            <!-- Drug Name Input -->
+            <div>
+                <label for="assess-drug-name" style="display: block; margin-bottom: 8px; font-weight: 600; color: #374151;">
+                    💊 Drug Name <span style="color: #dc2626;">*</span>
+                </label>
+                <input 
+                    type="text" 
+                    id="assess-drug-name" 
+                    placeholder="e.g., Aspirin, Metformin, Lisinopril"
+                    style="width: 100%; padding: 12px; border: 2px solid #d1d5db; border-radius: 8px; font-size: 14px; transition: border 0.3s;"
+                    onfocus="this.style.borderColor='#22c55e'"
+                    onblur="this.style.borderColor='#d1d5db'"
+                >
+            </div>
+
+            <!-- Condition/Target Input -->
+            <div>
+                <label for="assess-condition" style="display: block; margin-bottom: 8px; font-weight: 600; color: #374151;">
+                    🎯 Condition / Target Organ
+                </label>
+                <input 
+                    type="text" 
+                    id="assess-condition" 
+                    placeholder="e.g., Hypertension, Brain, Liver"
+                    style="width: 100%; padding: 12px; border: 2px solid #d1d5db; border-radius: 8px; font-size: 14px; transition: border 0.3s;"
+                    onfocus="this.style.borderColor='#22c55e'"
+                    onblur="this.style.borderColor='#d1d5db'"
+                >
+            </div>
+        </div>
+
+        <!-- Mouse Parameters Info Box -->
+        <div style="background: #eff6ff; border-left: 4px solid #3b82f6; padding: 15px; margin-bottom: 20px; border-radius: 6px;">
+            <p style="margin: 0; font-size: 14px; color: #1e40af;">
+                <strong>💡 Note:</strong> The assessment will automatically use mouse parameters (weight, age, dose, route) 
+                from your first study group above. Make sure to fill those in first for accurate predictions.
+            </p>
+        </div>
+
+        <!-- Assess Button -->
+        <button 
+            id="assess-drug-btn"
+            onclick="assessDrug()"
+            style="width: 100%; padding: 16px; background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); color: white; border: none; border-radius: 10px; font-size: 16px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 6px rgba(34, 197, 94, 0.3); transition: all 0.3s; display: flex; align-items: center; justify-content: center; gap: 10px;"
+            onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 12px rgba(34, 197, 94, 0.4)'"
+            onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 6px rgba(34, 197, 94, 0.3)'"
+        >
+            <span style="font-size: 20px;">🔬</span>
+            <span>Analyze Drug Properties</span>
+        </button>
+    </div>
+
+    <!-- Assessment Results Container -->
+    <div id="assessment-results" style="display: none; margin-top: 30px;">
+        <!-- Results will be dynamically inserted here by JavaScript -->
+    </div>
+
+</section>
+
+<!-- ============================================================================
+     TESTING SECTION (Optional - for debugging)
+     ============================================================================ -->
+
+<section class="testing-section" style="margin-top: 40px; padding: 30px; background: #f9fafb; border-radius: 12px; border: 2px solid #d1d5db;">
+    
+    <div style="text-align: center; margin-bottom: 20px;">
+        <h3 style="margin: 0 0 10px 0; color: #374151; font-size: 20px;">🧪 System Testing</h3>
+        <p style="margin: 0; color: #6b7280; font-size: 14px;">Test the assessment API and check system health</p>
+    </div>
+
+    <div style="display: flex; gap: 15px; justify-content: center; margin-bottom: 20px;">
+        <button 
+            id="run-tests-btn"
+            style="padding: 12px 24px; background: #3b82f6; color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.3s;"
+            onmouseover="this.style.background='#2563eb'"
+            onmouseout="this.style.background='#3b82f6'"
+        >
+            🧪 Run API Tests
+        </button>
+        
+        <button 
+            id="check-health-btn"
+            style="padding: 12px 24px; background: #10b981; color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.3s;"
+            onmouseover="this.style.background='#059669'"
+            onmouseout="this.style.background='#10b981'"
+        >
+            💚 Check System Health
+        </button>
+    </div>
+
+    <!-- Test Results Container -->
+    <div id="test-results" style="display: none; margin-top: 20px;">
+        <!-- Test results will be displayed here -->
+    </div>
+
+</section>
+
+<!-- ============================================================================
+     STYLES (Add to your <style> section or CSS file)
+     ============================================================================ -->
+
+<style>
+/* Toast Notifications */
+.toast {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    padding: 16px 24px;
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+    font-size: 14px;
+    font-weight: 600;
+    z-index: 10000;
+    animation: slideIn 0.3s ease-out;
+    max-width: 400px;
+}
+
+.toast.success {
+    border-left: 4px solid #22c55e;
+    color: #15803d;
+}
+
+.toast.error {
+    border-left: 4px solid #dc2626;
+    color: #991b1b;
+}
+
+.toast.warning {
+    border-left: 4px solid #f59e0b;
+    color: #92400e;
+}
+
+.toast.info {
+    border-left: 4px solid #3b82f6;
+    color: #1e40af;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(400px);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes slideOut {
+    from {
+        transform: translateX(0);
+        opacity: 1;
+    }
+    to {
+        transform: translateX(400px);
+        opacity: 0;
+    }
+}
+
+/* Loading Spinner */
+.spinner {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Button Loading State */
+.loading {
+    opacity: 0.7;
+    cursor: not-allowed !important;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .drug-assessment-section > div:first-of-type > div {
+        grid-template-columns: 1fr !important;
+    }
+    
+    .toast {
+        right: 15px;
+        left: 15px;
+        max-width: none;
+    }
+}
+</style>

@@ -1,0 +1,90 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXFileReference section */
+		0E77F3AA2EC9CF1C00CAAB6C /* app.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = app.py; sourceTree = "<group>"; };
+		0EE4B1F52ED2616400373997 /* staticcssstyle.css */ = {isa = PBXFileReference; lastKnownFileType = text.css; path = staticcssstyle.css; sourceTree = "<group>"; };
+		0EE4B1F62ED2618100373997 /* staticjsapp.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = staticjsapp.js; sourceTree = "<group>"; };
+		0EE4B1FE2ED26AB000373997 /* staticjssample-types.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "staticjssample-types.js"; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		0E77F3AB2EC9CF8900CAAB6C /* templates */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = templates;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXGroup section */
+		0E77F3A22EC9CDB400CAAB6C = {
+			isa = PBXGroup;
+			children = (
+				0E77F3AA2EC9CF1C00CAAB6C /* app.py */,
+				0E77F3AB2EC9CF8900CAAB6C /* templates */,
+				0EE4B1F52ED2616400373997 /* staticcssstyle.css */,
+				0EE4B1F62ED2618100373997 /* staticjsapp.js */,
+				0EE4B1FE2ED26AB000373997 /* staticjssample-types.js */,
+			);
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXProject section */
+		0E77F3A32EC9CDB400CAAB6C /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastUpgradeCheck = 2610;
+			};
+			buildConfigurationList = 0E77F3A62EC9CDB400CAAB6C /* Build configuration list for PBXProject "DrugPredictorApp" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 0E77F3A22EC9CDB400CAAB6C;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+			);
+		};
+/* End PBXProject section */
+
+/* Begin XCBuildConfiguration section */
+		0E77F3A72EC9CDB400CAAB6C /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+			};
+			name = Debug;
+		};
+		0E77F3A82EC9CDB400CAAB6C /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		0E77F3A62EC9CDB400CAAB6C /* Build configuration list for PBXProject "DrugPredictorApp" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				0E77F3A72EC9CDB400CAAB6C /* Debug */,
+				0E77F3A82EC9CDB400CAAB6C /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 0E77F3A32EC9CDB400CAAB6C /* Project object */;
+}

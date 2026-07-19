@@ -1,0 +1,175 @@
+<!-- ============================================================================
+     BUTTON INTEGRATION - How to make "Analyze" button show everything
+     ============================================================================ -->
+
+<!-- OPTION 1: If your button currently looks like this -->
+<!-- BEFORE: -->
+<!-- <button onclick="predict()">Analyze & Get ML-Powered Recommendations</button> -->
+
+<!-- AFTER: Change to this -->
+<button onclick="getEnhancedPredictionsIntegrated()" 
+        style="padding: 16px 32px; background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; border: none; border-radius: 10px; font-size: 16px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 6px rgba(59, 130, 246, 0.3);">
+    <span style="font-size: 20px;">🔬</span>
+    Analyze & Get ML-Powered Recommendations
+</button>
+
+<!-- ============================================================================
+     OPTION 2: If you need to preserve existing functionality
+     ============================================================================ -->
+
+<!-- This version runs BOTH the old prediction AND the new drug assessment -->
+<button onclick="runCompleteAnalysis()" 
+        style="padding: 16px 32px; background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; border: none; border-radius: 10px; font-size: 16px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 6px rgba(59, 130, 246, 0.3);">
+    <span style="font-size: 20px;">🔬</span>
+    Analyze & Get ML-Powered Recommendations
+</button>
+
+<script>
+async function runCompleteAnalysis() {
+    // Run your existing prediction function first
+    if (typeof predict === 'function') {
+        await predict(); // Wait for existing analysis
+    }
+    
+    // Then run the enhanced drug assessment
+    await getEnhancedPredictionsIntegrated();
+}
+</script>
+
+<!-- ============================================================================
+     OPTION 3: With loading states and better UX
+     ============================================================================ -->
+
+<button id="comprehensive-analyze-btn" 
+        onclick="comprehensiveAnalysis()"
+        style="width: 100%; padding: 16px 32px; background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; border: none; border-radius: 10px; font-size: 16px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 6px rgba(59, 130, 246, 0.3); transition: all 0.3s; display: flex; align-items: center; justify-content: center; gap: 10px;"
+        onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 12px rgba(59, 130, 246, 0.4)'"
+        onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 6px rgba(59, 130, 246, 0.3)'">
+    <span style="font-size: 24px;">🔬</span>
+    <span>Analyze & Get ML-Powered Recommendations</span>
+</button>
+
+<script>
+async function comprehensiveAnalysis() {
+    const btn = document.getElementById('comprehensive-analyze-btn');
+    
+    try {
+        // Disable button and show loading
+        btn.disabled = true;
+        btn.style.opacity = '0.7';
+        btn.innerHTML = '<span class="spinner" style="display: inline-block; width: 20px; height: 20px; border: 3px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 0.6s linear infinite;"></span> Analyzing...';
+        
+        // Step 1: Sample Size Analysis (if you have an existing function)
+        if (typeof predict === 'function') {
+            await predict();
+        }
+        
+        // Step 2: Drug Assessment
+        await getEnhancedPredictionsIntegrated();
+        
+    } catch (error) {
+        console.error('Analysis error:', error);
+        alert('Analysis failed: ' + error.message);
+    } finally {
+        // Re-enable button
+        btn.disabled = false;
+        btn.style.opacity = '1';
+        btn.innerHTML = '<span style="font-size: 24px;">🔬</span><span>Analyze & Get ML-Powered Recommendations</span>';
+    }
+}
+</script>
+
+<style>
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+</style>
+
+<!-- ============================================================================
+     COMPLETE EXAMPLE - Copy everything below into your index.html
+     ============================================================================ -->
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Rodent Study Planner</title>
+    <style>
+        /* Include existing styles here */
+        
+        /* New styles for integrated results */
+        #integrated-drug-assessment {
+            margin-top: 30px;
+            animation: fadeIn 0.5s ease-in;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    
+    <!-- Your existing study groups form here -->
+    
+    <!-- Analyze Button (MODIFIED) -->
+    <div style="text-align: center; margin: 30px 0;">
+        <button id="main-analyze-btn" 
+                onclick="comprehensiveAnalysis()"
+                style="padding: 16px 48px; background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; border: none; border-radius: 10px; font-size: 18px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 6px rgba(59, 130, 246, 0.3); transition: all 0.3s;">
+            <span style="font-size: 24px;">🔬</span>
+            Analyze & Get ML-Powered Recommendations
+        </button>
+    </div>
+    
+    <!-- Results will appear here automatically -->
+    <div id="results-container"></div>
+    
+    <!-- Scripts -->
+    <script src="/static/js/app.js"></script>
+    
+    <script>
+    async function comprehensiveAnalysis() {
+        const btn = document.getElementById('main-analyze-btn');
+        
+        try {
+            // Show loading state
+            btn.disabled = true;
+            btn.innerHTML = '<span style="display: inline-block; width: 20px; height: 20px; border: 3px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 0.6s linear infinite;"></span> Analyzing...';
+            
+            // Run the comprehensive analysis
+            await getEnhancedPredictionsIntegrated();
+            
+        } catch (error) {
+            console.error('Analysis error:', error);
+            alert('❌ Analysis failed: ' + error.message);
+        } finally {
+            // Restore button
+            btn.disabled = false;
+            btn.innerHTML = '<span style="font-size: 24px;">🔬</span> Analyze & Get ML-Powered Recommendations';
+        }
+    }
+    </script>
+    
+</body>
+</html>
+
+<!-- ============================================================================
+     QUICK SUMMARY
+     ============================================================================ -->
+
+<!--
+WHAT TO DO:
+1. Find your "Analyze & Get ML-Powered Recommendations" button
+2. Change its onclick from predict() to getEnhancedPredictionsIntegrated()
+3. Save and refresh
+4. Click the button
+5. See both sample size AND drug assessment results!
+
+That's it! 🎉
+-->

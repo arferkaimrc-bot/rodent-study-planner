@@ -1,0 +1,18 @@
+# Render Blueprint — builds from the Dockerfile and runs the app on the free plan.
+# Enter DATABASE_URL / ADMIN_* in the Render dashboard (marked sync:false).
+services:
+  - type: web
+    name: rodent-study-planner
+    runtime: docker
+    plan: free
+    region: frankfurt          # closest free region to Saudi Arabia
+    healthCheckPath: /health
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true    # Render auto-generates a strong secret
+      - key: DATABASE_URL
+        sync: false            # paste your Neon connection string
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false

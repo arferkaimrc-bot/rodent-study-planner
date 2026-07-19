@@ -1,0 +1,15 @@
+venv/
+__pycache__/
+*.pyc
+*.pyo
+cache/
+*.db
+app.log
+.DS_Store
+.git/
+.env
+neon_url.txt
+init_neon.py
+STEPready-Complete.zip
+scratch_*.py
+*.md

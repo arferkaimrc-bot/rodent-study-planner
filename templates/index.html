@@ -1,0 +1,1886 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enhanced Rodent Study Planner v3.0 - Professional Edition</title>
+
+    <style>
+        :root {
+            --bg: #f3f7fa;
+            --surface: #ffffff;
+            --text: #222;
+            --muted: #586770;
+            --primary: #26a65b;
+            --primary-600: #1f8f4e;
+            --primary-700: #168d43;
+            --border: #cfe9dc;
+            --card-accent: #e9f8ef;
+            --danger: #c82529;
+            --warning: #f59e0b;
+            --info: #3b82f6;
+            --radius: 14px;
+            --shadow: 0 10px 28px rgba(0,0,0,.08);
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Arial, sans-serif;
+            color: var(--text);
+            margin: 0;
+            background: linear-gradient(180deg, #f7fbff, var(--bg));
+            min-height: 100vh;
+            padding-bottom: 40px;
+        }
+
+        .main-container {
+            max-width: 1200px;
+            margin: 28px auto;
+            background: var(--surface);
+            padding: 32px;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            border: 1.5px solid var(--border);
+        }
+
+        .header-section {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 28px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid var(--border);
+        }
+
+        h1.main-title {
+            color: var(--primary);
+            margin: 0;
+            font-size: 2rem;
+        }
+
+        .version-badge {
+            background: var(--primary);
+            color: white;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .feature-banner {
+            background: linear-gradient(135deg, #e0f2fe 0%, #dbeafe 100%);
+            border: 1px solid #93c5fd;
+            border-radius: 12px;
+            padding: 16px 20px;
+            margin-bottom: 24px;
+        }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
+            margin-top: 12px;
+        }
+
+        .feature-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9rem;
+            color: #1e3a8a;
+        }
+
+        .feature-item .icon {
+            font-size: 1.2rem;
+        }
+
+        .meta-section {
+            background: var(--card-accent);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 24px;
+        }
+
+        .meta-section h2 {
+            margin: 0 0 16px 0;
+            color: var(--primary-600);
+            font-size: 1.3rem;
+        }
+
+        .meta-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 16px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        label {
+            font-weight: 700;
+            color: var(--primary-600);
+            margin-bottom: 8px;
+            font-size: 0.95rem;
+        }
+
+        input, select, textarea {
+            width: 100%;
+            padding: 12px 14px;
+            border-radius: 10px;
+            border: 1.5px solid var(--border);
+            background: #fff;
+            transition: all .2s ease;
+            font-size: 0.95rem;
+            font-family: inherit;
+        }
+
+        input:focus, select:focus, textarea:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(38,166,91,.15);
+            outline: none;
+        }
+
+        #groups-area {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+            gap: 20px;
+            margin-bottom: 24px;
+        }
+
+        .group-container {
+            position: relative;
+            border: 2px solid var(--border);
+            border-radius: 14px;
+            background: linear-gradient(180deg, #ffffff, var(--card-accent));
+            padding: 20px;
+            box-shadow: 0 6px 20px rgba(0,0,0,.08);
+            transition: transform .2s ease, box-shadow .2s ease;
+        }
+
+        .group-container:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(0,0,0,.12);
+        }
+
+        .group-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 2px solid var(--border);
+        }
+
+        .delete-group-btn {
+            background: var(--danger);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 6px 12px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .grid-form {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 14px;
+            align-items: start;
+        }
+
+        .tile-group {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(85px, 1fr));
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .tile {
+            appearance: none;
+            border: none;
+            cursor: pointer;
+            padding: 10px 8px;
+            border-radius: 10px;
+            background: linear-gradient(180deg, #ffffff, #f9fafb);
+            border: 1.5px solid var(--border);
+            box-shadow: 0 2px 8px rgba(0,0,0,.06);
+            color: var(--text);
+            font-weight: 600;
+            font-size: 0.9rem;
+            transition: all .15s ease;
+        }
+
+        .tile:hover {
+            transform: translateY(-1px);
+            border-color: var(--primary-600);
+        }
+
+        .tile.selected {
+            border-color: var(--primary);
+            background: linear-gradient(180deg, rgba(38,166,91,0.2), rgba(38,166,91,0.1));
+            color: #0f5f32;
+        }
+
+        .sample-types-container {
+            grid-column: 1 / -1;
+        }
+
+        .result-section {
+            margin-top: 16px;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        .section-title {
+            background: linear-gradient(180deg, #f1f5f9, #e2e8f0);
+            padding: 10px 14px;
+            font-weight: 800;
+            font-size: 0.95rem;
+            color: #0f172a;
+        }
+        .section-body { padding: 12px 14px; }
+        .sec-list { margin: 0; padding-left: 20px; font-size: 0.88rem; }
+        .sec-list li { margin-bottom: 5px; }
+        .sec-note { font-size: 0.82rem; color: var(--muted); margin: 0 0 8px 0; }
+        .timeline-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        .timeline-table th {
+            text-align: left; background: #f8fafc; color: var(--muted);
+            padding: 7px 9px; border-bottom: 2px solid var(--border); font-size: 0.78rem;
+        }
+        .timeline-table td { padding: 7px 9px; border-bottom: 1px solid var(--border); vertical-align: top; }
+        .timeline-table td[contenteditable] { cursor: text; }
+        .timeline-table td[contenteditable]:focus {
+            outline: 2px solid var(--primary); background: #f0fdf4; border-radius: 4px;
+        }
+        .tl-day { white-space: nowrap; font-weight: 700; color: var(--primary-700); width: 90px; }
+        .tl-phase { white-space: nowrap; font-weight: 600; width: 110px; }
+        .tl-del { color: var(--danger); cursor: pointer; text-align: center; width: 28px; user-select: none; }
+        .tl-del:hover { font-weight: 800; }
+        .tl-add-btn {
+            margin-top: 10px; padding: 7px 14px; background: #e2e8f0; color: #0f172a;
+            border: none; border-radius: 8px; font-weight: 600; font-size: 0.82rem; cursor: pointer;
+        }
+        .tl-add-btn:hover { background: #cbd5e1; }
+        .plan-export-btn {
+            margin: 10px 6px 0 0; padding: 8px 16px; color: #fff; border: none;
+            border-radius: 8px; font-weight: 700; font-size: 0.85rem; cursor: pointer;
+            background: linear-gradient(180deg, #3b82f6, #2563eb);
+        }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            margin: 12px 0 4px 0;
+        }
+        .summary-tile {
+            background: #f9fafb;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 12px 14px;
+        }
+        .summary-tile.highlight {
+            background: linear-gradient(180deg, rgba(38,166,91,0.14), rgba(38,166,91,0.06));
+            border-color: var(--primary);
+        }
+        .summary-tile.wide { grid-column: 1 / -1; }
+        .stile-label {
+            font-size: 0.78rem;
+            color: var(--muted);
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        .stile-value {
+            font-size: 1.35rem;
+            font-weight: 800;
+            color: var(--text);
+            line-height: 1.15;
+        }
+        .stile-sub {
+            font-size: 0.75rem;
+            color: var(--muted);
+            margin-top: 3px;
+        }
+
+        .tox-endpoints-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .tox-endpoint {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 9px 12px;
+            border-radius: 9px;
+            background: #fff;
+            border: 1.5px solid var(--border);
+            cursor: pointer;
+            font-size: 0.88rem;
+            transition: all .15s ease;
+        }
+
+        .tox-endpoint:hover {
+            border-color: var(--primary-600);
+        }
+
+        .tox-endpoint:has(input:checked) {
+            border-color: var(--primary);
+            background: linear-gradient(180deg, rgba(38,166,91,0.16), rgba(38,166,91,0.08));
+            color: #0f5f32;
+            font-weight: 600;
+        }
+
+        .tox-endpoint input {
+            width: 16px;
+            height: 16px;
+            accent-color: var(--primary);
+        }
+
+        .sample-types-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 8px;
+            margin-top: 8px;
+            max-height: 200px;
+            overflow-y: auto;
+            padding: 10px;
+            background: #f9fafb;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+
+        .sample-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px;
+            cursor: pointer;
+            border-radius: 6px;
+        }
+
+        .sample-checkbox:hover {
+            background: #e5e7eb;
+        }
+
+        /* Blood Quantity Section */
+        .blood-quantity-section {
+            grid-column: 1 / -1;
+            background: #fef3c7;
+            border: 2px solid #f59e0b;
+            border-radius: 10px;
+            padding: 12px;
+            margin-top: 12px;
+            display: none;
+        }
+
+        .blood-quantity-section.show {
+            display: block;
+        }
+
+        .blood-quantity-section h4 {
+            margin: 0 0 12px 0;
+            color: #92400e;
+            font-size: 1rem;
+        }
+
+        .blood-params {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 12px;
+        }
+
+        button, .btn {
+            background: linear-gradient(180deg, var(--primary), var(--primary-700));
+            color: white;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 0.95rem;
+            font-weight: 600;
+            transition: all .2s ease;
+            box-shadow: 0 4px 12px rgba(38,166,91,.25);
+            font-family: inherit;
+        }
+
+        button:hover, .btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(38,166,91,.35);
+        }
+
+        #analyze-btn {
+            width: 100%;
+            padding: 16px;
+            font-size: 1.1rem;
+            margin-top: 8px;
+        }
+
+        .progress-container {
+            display: none;
+            margin: 24px 0;
+        }
+
+        .progress-bar-bg {
+            background: #e5e7eb;
+            height: 24px;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary), var(--primary-600));
+            width: 0%;
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+            font-size: 0.85rem;
+        }
+
+        #results-container {
+            margin-top: 32px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+            gap: 20px;
+        }
+
+        .result-card {
+            background: #ffffff;
+            border: 2px solid var(--border);
+            border-radius: 14px;
+            padding: 24px;
+            line-height: 1.6;
+            box-shadow: 0 8px 24px rgba(0,0,0,.08);
+        }
+
+        .result-card h4 {
+            margin: 0 0 16px 0;
+            color: var(--primary-700);
+            font-size: 1.2rem;
+            padding-bottom: 12px;
+            border-bottom: 2px solid var(--border);
+        }
+
+        .validation-badge {
+            display: inline-block;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-weight: 700;
+            font-size: 0.9rem;
+            margin-left: 8px;
+        }
+
+        .validation-badge.high { background: #d1fae5; color: #065f46; }
+        .validation-badge.medium { background: #fef3c7; color: #92400e; }
+        .validation-badge.low { background: #fee2e2; color: #991b1b; }
+
+        .ml-indicator {
+            display: inline-block;
+            background: linear-gradient(135deg, #a78bfa, #8b5cf6);
+            color: white;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            margin-left: 8px;
+        }
+
+        .source-badge {
+            display: inline-block;
+            background: #e0f2fe;
+            color: #0c4a6e;
+            padding: 3px 8px;
+            border-radius: 8px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin: 2px;
+        }
+
+        .blood-warning {
+            background: #fef3c7;
+            border-left: 4px solid #f59e0b;
+            padding: 12px;
+            margin: 12px 0;
+            border-radius: 6px;
+        }
+
+        .blood-warning.danger {
+            background: #fee2e2;
+            border-left-color: #c82529;
+        }
+
+        .blood-warning.safe {
+            background: #d1fae5;
+            border-left-color: #26a65b;
+        }
+
+        .collapsible-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            padding: 12px;
+            background: var(--card-accent);
+            border-radius: 8px;
+            margin-top: 12px;
+        }
+
+        .collapsible-header:hover {
+            background: #d1fae5;
+        }
+
+        .collapsible-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height .3s ease;
+        }
+
+        .collapsible-content.open {
+            max-height: 3000px;
+        }
+
+        /* NEW: Comprehensive Drug Analysis Styles */
+        .comprehensive-analysis-card {
+            background: linear-gradient(135deg, #f5f7fa 0%, #f0f4f8 100%);
+            border: 2px solid #667eea;
+            border-radius: 14px;
+            padding: 24px;
+            margin: 20px 0;
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.15);
+        }
+
+        .analysis-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            padding-bottom: 16px;
+            border-bottom: 2px solid #667eea;
+        }
+
+        .analysis-header h3 {
+            margin: 0;
+            color: #667eea;
+            font-size: 1.3rem;
+        }
+
+        .score-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .score-card {
+            background: white;
+            border-radius: 12px;
+            padding: 16px;
+            border: 1.5px solid #ddd;
+        }
+
+        .score-label {
+            color: var(--muted);
+            font-size: 0.9rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .score-percentage {
+            font-size: 2.2rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .progress-bar-comprehensive {
+            width: 100%;
+            height: 12px;
+            background: #e0e0e0;
+            border-radius: 6px;
+            overflow: hidden;
+            margin-bottom: 8px;
+        }
+
+        .progress-fill-toxicity {
+            height: 100%;
+            background: linear-gradient(90deg, #10b981 0%, #f59e0b 50%, #ef4444 100%);
+            border-radius: 6px;
+            transition: width 0.3s ease;
+        }
+
+        .progress-fill-efficacy {
+            height: 100%;
+            background: linear-gradient(90deg, #ef4444 0%, #f59e0b 50%, #10b981 100%);
+            border-radius: 6px;
+            transition: width 0.3s ease;
+        }
+
+        .score-interpretation {
+            font-size: 0.85rem;
+            color: var(--muted);
+            font-style: italic;
+        }
+
+        .safety-margin-box {
+            background: white;
+            border-left: 4px solid #667eea;
+            padding: 16px;
+            border-radius: 8px;
+            margin: 16px 0;
+        }
+
+        .safety-margin-value {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #667eea;
+            margin-bottom: 4px;
+        }
+
+        .safety-profile {
+            font-weight: 600;
+            color: var(--primary);
+            margin-bottom: 4px;
+        }
+
+        .parameters-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 12px;
+            margin: 16px 0;
+        }
+
+        .parameter-item {
+            background: white;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+            font-size: 0.9rem;
+        }
+
+        .parameter-label {
+            color: var(--muted);
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .parameter-value {
+            color: var(--primary);
+            font-weight: 700;
+            margin-top: 4px;
+        }
+
+        .recommendations-box {
+            background: #f0fdf4;
+            border: 1.5px solid #86efac;
+            border-radius: 8px;
+            padding: 16px;
+            margin: 16px 0;
+        }
+
+        .recommendations-box h5 {
+            margin: 0 0 12px 0;
+            color: #15803d;
+        }
+
+        .recommendations-box ul {
+            margin: 0;
+            padding-left: 20px;
+        }
+
+        .recommendations-box li {
+            margin-bottom: 8px;
+            color: #166534;
+        }
+
+        .literature-section {
+            background: #eff6ff;
+            border: 1.5px solid #93c5fd;
+            border-radius: 8px;
+            padding: 16px;
+            margin: 16px 0;
+        }
+
+        .literature-section h5 {
+            margin: 0 0 12px 0;
+            color: #1e40af;
+        }
+
+        .literature-link {
+            display: inline-block;
+            background: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: 1px solid #93c5fd;
+            margin: 4px 8px 4px 0;
+            text-decoration: none;
+            color: #0c4a6e;
+            font-weight: 500;
+            font-size: 0.85rem;
+            transition: all 0.2s ease;
+        }
+
+        .literature-link:hover {
+            background: #dbeafe;
+            border-color: #3b82f6;
+        }
+
+        @media (max-width: 768px) {
+            .main-container {
+                margin: 16px;
+                padding: 20px;
+            }
+            
+            #groups-area {
+                grid-template-columns: 1fr;
+            }
+
+            .score-row {
+                grid-template-columns: 1fr;
+            }
+        }
+
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        {% if current_user and current_user.is_authenticated %}
+        <!-- User bar -->
+        <div style="display:flex;justify-content:flex-end;align-items:center;gap:14px;padding:6px 0;font-size:0.85rem;color:var(--muted);">
+            <span>👤 {{ current_user.name or current_user.email }}</span>
+            {% if current_user.is_admin %}
+            <a href="/admin" style="color:#15803d;font-weight:600;text-decoration:none;">👥 Users</a>
+            {% endif %}
+            <a href="/change-password" style="color:#15803d;text-decoration:none;">🔑 Password</a>
+            <a href="/logout" style="color:#991b1b;font-weight:600;text-decoration:none;">Sign out</a>
+        </div>
+        {% endif %}
+        <!-- Header -->
+        <div class="header-section">
+            <div>
+                <h1 class="main-title">🐭 Enhanced Rodent Study Planner</h1>
+                <p style="margin: 4px 0 0 0; color: var(--muted); font-size: 0.95rem;">
+                    ML-Powered Statistical Analysis with Multi-Source Literature Search
+                </p>
+            </div>
+        </div>
+
+        <!-- Feature Banner -->
+        <div class="feature-banner">
+            <h2 style="margin: 0 0 8px 0; color: #1e40af;">📋 A decision-support aid for early study planning</h2>
+            <p style="margin: 0; color: #1e3a5f; font-size: 0.95rem; line-height: 1.5;">
+                This platform aggregates <strong>published experimental data</strong> (PubChem/ChemIDplus) and
+                <strong>standard statistical methods</strong> (power analysis) to help researchers explore starting
+                points for animal numbers, doses, and sampling — <strong>before</strong> writing a protocol.
+                It <strong>does not replace</strong> the actual experiment, pilot data, veterinary consultation, or
+                IACUC review. Every output is a suggestion to be <strong>verified against the cited primary sources</strong>.
+            </p>
+        </div>
+
+        <!-- Study Metadata -->
+        <div class="meta-section">
+            <h2>📋 Study Information</h2>
+            <div class="meta-row">
+                <div class="form-group">
+                    <label for="study-title">Study / Experiment Title</label>
+                    <input type="text" id="study-title" placeholder="e.g., Ibuprofen neuroprotection in C57BL/6 mice">
+                </div>
+                <div class="form-group">
+                    <label for="pi-name">Principal Investigator</label>
+                    <input type="text" id="pi-name" placeholder="Dr. Jane Smith">
+                </div>
+                <div class="form-group">
+                    <label for="institution">Institution</label>
+                    <input type="text" id="institution" placeholder="University Research Center">
+                </div>
+            </div>
+        </div>
+
+        <!-- Groups Section -->
+        <div class="groups-section">
+            <h2>🧪 Experimental Groups</h2>
+            <div id="groups-area"></div>
+        </div>
+
+        <!-- Controls -->
+        <div style="display: flex; gap: 12px; flex-wrap: wrap; margin: 24px 0;">
+            <button id="add-group-btn">➕ Add Treatment Group</button>
+            <button id="study-plan-pdf-btn" style="background: linear-gradient(180deg, #3b82f6, #2563eb);">📄 Export PDF</button>
+            <button id="study-plan-docx-btn" style="background: linear-gradient(180deg, #3b82f6, #2563eb);">📝 Export Word</button>
+        </div>
+
+        <!-- Main analyze button -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 24px;">
+            <button id="analyze-btn">🔬 Analyze & Get ML-Powered Recommendations</button>
+            <button id="comprehensive-analyze-btn" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none;">🧬 Comprehensive Drug Analysis </button>
+        </div>
+
+        <!-- Progress indicator -->
+        <div class="progress-container" id="progress-container">
+            <div class="progress-bar-bg">
+                <div class="progress-bar" id="progress-bar">0%</div>
+            </div>
+            <p style="text-align: center; margin-top: 8px; color: var(--muted); font-size: 0.9rem;" id="progress-text">
+                Initializing analysis...
+            </p>
+        </div>
+
+        <!-- Results -->
+        <div id="results-container"></div>
+    </div>
+
+    <script>
+        let groupCount = 0;
+        const SAMPLE_TYPES = [];
+        let sampleTypesLoaded = false;
+
+        // Load sample types
+        async function loadSampleTypes() {
+            try {
+                const res = await fetch('/sample-types');
+                const data = await res.json();
+                SAMPLE_TYPES.push(...data.sample_types);
+                sampleTypesLoaded = true;
+                console.log('✅ Sample types loaded:', SAMPLE_TYPES.length);
+            } catch (err) {
+                console.error('Failed to load sample types:', err);
+            }
+        }
+
+        function showProgress(percent, text) {
+            const container = document.getElementById('progress-container');
+            const bar = document.getElementById('progress-bar');
+            const progressText = document.getElementById('progress-text');
+            
+            container.style.display = 'block';
+            bar.style.width = percent + '%';
+            bar.textContent = percent + '%';
+            progressText.textContent = text;
+        }
+
+        function hideProgress() {
+            document.getElementById('progress-container').style.display = 'none';
+        }
+
+        function tileInit(container) {
+            container.querySelectorAll('.tile-group').forEach(group => {
+                const targetSelector = group.getAttribute('data-target');
+                if (!targetSelector) return;
+                
+                const hiddenInput = container.querySelector(targetSelector);
+                if (!hiddenInput) return;
+
+                const current = (hiddenInput.value || '').trim();
+
+                group.querySelectorAll('.tile').forEach(tile => {
+                    const val = tile.getAttribute('data-value');
+                    if (val === current) {
+                        tile.classList.add('selected');
+                    }
+
+                    tile.addEventListener('click', () => {
+                        group.querySelectorAll('.tile').forEach(t => t.classList.remove('selected'));
+                        tile.classList.add('selected');
+                        hiddenInput.value = val;
+                        
+                        // Show/hide blood quantity section
+                        updateBloodQuantitySection(container);
+                    });
+                });
+            });
+        }
+
+        function createSampleTypesSelector(container, selectedTypes = []) {
+            const sampleTypesDiv = container.querySelector('.sample-types-grid');
+            if (!sampleTypesDiv) {
+                console.warn('Sample types container not found in group');
+                return;
+            }
+            
+            if (SAMPLE_TYPES.length === 0) {
+                console.warn('No sample types loaded yet');
+                sampleTypesDiv.innerHTML = '<p style="color: var(--muted); font-style: italic;">Loading sample types...</p>';
+                return;
+            }
+
+            sampleTypesDiv.innerHTML = '';
+
+            SAMPLE_TYPES.forEach(type => {
+                const label = document.createElement('label');
+                label.className = 'sample-checkbox';
+
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.value = type;
+                checkbox.checked = selectedTypes.includes(type);
+                
+                // Listen for changes to show/hide blood quantity
+                checkbox.addEventListener('change', () => {
+                    updateBloodQuantitySection(container);
+                });
+
+                const span = document.createElement('span');
+                span.textContent = type;
+
+                label.appendChild(checkbox);
+                label.appendChild(span);
+                sampleTypesDiv.appendChild(label);
+            });
+            
+            console.log(`✅ Created ${SAMPLE_TYPES.length} sample type checkboxes`);
+        }
+
+        function getSelectedSampleTypes(container) {
+            const checkboxes = container.querySelectorAll('.sample-types-grid input[type="checkbox"]:checked');
+            return Array.from(checkboxes).map(cb => cb.value);
+        }
+
+        function updateBloodQuantitySection(container) {
+            const bloodSection = container.querySelector('.blood-quantity-section');
+            const selectedSamples = getSelectedSampleTypes(container);
+            
+            const hasBloodSample = selectedSamples.some(s =>
+                s.toLowerCase().includes('blood') ||
+                s.toLowerCase().includes('plasma') ||
+                s.toLowerCase().includes('serum')
+            );
+            
+            if (hasBloodSample) {
+                bloodSection.classList.add('show');
+            } else {
+                bloodSection.classList.remove('show');
+            }
+        }
+
+        function addGroup(isControl = false, data = null) {
+            groupCount++;
+
+            const groupName = data?.group_name || (isControl ? 'Control Group' : `Treatment Group ${groupCount}`);
+            const drugName = data?.drug_name || (isControl ? 'Saline' : '');
+            const groupId = `group-${groupCount}`;
+
+            const groupHtml = `
+                <div class="group-container" id="${groupId}">
+                    <div class="group-header">
+                        <h3 style="margin: 0; color: var(--primary-700);">${groupName}</h3>
+                        ${!isControl ? `<button class="delete-group-btn" onclick="deleteGroup('${groupId}')">🗑️ Delete</button>` : ""}
+                    </div>
+                    
+                    <div class="grid-form">
+                        <div class="form-group" style="grid-column: 1 / -1;">
+                            <label>Experimental Paradigm / Type:</label>
+                            <input type="hidden" class="experiment-type" value="${data?.experiment_type || 'Toxicology'}">
+                            <div class="tile-group paradigm-group" data-target=".experiment-type">
+                                <button type="button" class="tile" data-value="Oncology">🎗️ Oncology</button>
+                                <button type="button" class="tile" data-value="Immunology">🛡️ Immunology</button>
+                                <button type="button" class="tile" data-value="Neuroscience">🧠 Neuroscience</button>
+                                <button type="button" class="tile" data-value="Metabolic">🍬 Metabolic</button>
+                                <button type="button" class="tile" data-value="Cardiovascular">🫀 Cardiovascular</button>
+                                <button type="button" class="tile" data-value="Toxicology">🧪 Toxicology</button>
+                                <button type="button" class="tile" data-value="Custom">✨ Custom</button>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Group Name:</label>
+                            <input type="text" class="group-name" value="${groupName}">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Drug Name: <span style="color: var(--danger);">*</span></label>
+                            <input type="text" class="drug-name" value="${drugName}" placeholder="e.g., Ibuprofen" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Dose (mg/kg):</label>
+                            <input type="number" class="dose" value="${data?.dose ?? (isControl ? '0' : '')}" min="0" step="0.1">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Species:</label>
+                            <input type="hidden" class="species" value="${data?.species || 'Mouse'}">
+                            <div class="tile-group species-group" data-target=".species">
+                                <button type="button" class="tile" data-value="Mouse">🐭 Mouse</button>
+                                <button type="button" class="tile" data-value="Rat">🐀 Rat</button>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Strain:</label>
+                            <select class="strain" data-initial="${data?.strain || ''}" onchange="handleStrainChange(this)"></select>
+                            <input type="text" class="strain-custom" placeholder="Enter custom strain"
+                                   style="display: none; margin-top: 8px;" value="">
+                        </div>
+
+                        <div class="form-group">
+                            <label>Sex:</label>
+                            <input type="hidden" class="sex" value="${data?.sex || 'Male'}">
+                            <div class="tile-group" data-target=".sex">
+                                <button type="button" class="tile" data-value="Male">♂ Male</button>
+                                <button type="button" class="tile" data-value="Female">♀ Female</button>
+                                <button type="button" class="tile" data-value="Mixed">⚥ Mixed</button>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Number of Animals: <span style="color: var(--danger);">*</span></label>
+                            <input type="number" class="num-mice" placeholder="e.g., 10" value="${data?.num_mice || ''}" min="1" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Weight (g):</label>
+                            <input type="number" class="weight" placeholder="25" value="${data?.weight || 25}" min="10" max="60">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Age (weeks):</label>
+                            <input type="number" class="age" placeholder="8" value="${data?.age || 8}" min="2" max="104">
+                        </div>
+
+                        <div class="form-group">
+                            <label>Route:</label>
+                            <input type="hidden" class="route" value="${data?.route || 'Oral'}">
+                            <div class="tile-group" data-target=".route">
+                                <button type="button" class="tile" data-value="Oral">💊 Oral</button>
+                                <button type="button" class="tile" data-value="IP">IP</button>
+                                <button type="button" class="tile" data-value="IV">IV</button>
+                                <button type="button" class="tile" data-value="SC">SC</button>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Diet Type:</label>
+                            <input type="hidden" class="diet-type" value="${data?.diet_type || 'Standard'}">
+                            <div class="tile-group" data-target=".diet-type">
+                                <button type="button" class="tile" data-value="Standard">Standard</button>
+                                <button type="button" class="tile" data-value="High fat">High fat</button>
+                                <button type="button" class="tile" data-value="Fast">Fast</button>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Start Date:</label>
+                            <input type="date" class="start-date" value="${data?.start_date || ''}">
+                        </div>
+
+                        <div class="form-group" style="grid-column: 1 / -1;">
+                            <label>Special Instructions:</label>
+                            <textarea class="instructions" placeholder="e.g., Administer in the morning, Monitor for adverse effects..." 
+                                      style="min-height: 60px; resize: vertical;">${data?.instructions || ''}</textarea>
+                        </div>
+
+                        <div class="form-group" style="grid-column: 1 / -1;">
+                            <label>🧪 Toxicity Endpoints to Assess:</label>
+                            <div class="tox-endpoints-grid">
+                                ${['Hepatotoxicity (ALT/AST)','Nephrotoxicity (BUN/Creatinine)','Cardiotoxicity (Troponin/ECG)','Neurological / Grimace Score','Weight fluctuation curves','Histopathology assessment'].map(ep => `
+                                    <label class="tox-endpoint">
+                                        <input type="checkbox" class="tox-endpoint-cb" value="${ep}"
+                                            ${(data?.toxicity_endpoints || []).includes(ep) ? 'checked' : ''}>
+                                        <span>${ep}</span>
+                                    </label>`).join('')}
+                            </div>
+                        </div>
+
+                        <div class="form-group sample-types-container">
+                            <label>Biological Sample Types to Collect:</label>
+                            <div class="sample-types-grid"></div>
+                        </div>
+
+                        <!-- Blood Quantity Calculator -->
+                        <div class="blood-quantity-section">
+                            <h4>💉 Blood Collection Parameters</h4>
+                            <div class="blood-params">
+                                <div class="form-group">
+                                    <label style="font-size: 0.85rem;">Timepoints:</label>
+                                    <input type="number" class="blood-timepoints" value="1" min="1" max="10">
+                                </div>
+                                <div class="form-group">
+                                    <label style="font-size: 0.85rem;">Replicates:</label>
+                                    <input type="number" class="blood-replicates" value="1" min="1" max="5">
+                                </div>
+                            </div>
+                            <p style="font-size: 0.85rem; color: #92400e; margin: 8px 0 0 0;">
+                                Blood quantity will be calculated automatically based on selected assays and animal weight.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('groups-area').insertAdjacentHTML('beforeend', groupHtml);
+            
+            const groupElement = document.getElementById(groupId);
+            tileInit(groupElement);
+            initSpeciesStrain(groupElement);
+            createSampleTypesSelector(groupElement, data?.sample_types || []);
+        }
+
+        window.deleteGroup = function(groupId) {
+            if (confirm('Delete this group?')) {
+                document.getElementById(groupId)?.remove();
+            }
+        };
+
+        // Strain lists and default body weights per species
+        const STRAINS = {
+            Mouse: ['C57BL/6', 'BALB/c', 'CD-1', 'NOD', 'DBA/2'],
+            Rat: ['Sprague-Dawley', 'Wistar', 'Long-Evans', 'Fischer 344']
+        };
+        const SPECIES_DEFAULTS = {
+            Mouse: { weight: 25, weightMax: 60 },
+            Rat: { weight: 250, weightMax: 600 }
+        };
+
+        function populateStrains(groupEl) {
+            const species = groupEl.querySelector('.species').value || 'Mouse';
+            const select = groupEl.querySelector('.strain');
+            const custom = groupEl.querySelector('.strain-custom');
+            const initial = select.getAttribute('data-initial') || '';
+            const list = STRAINS[species] || STRAINS.Mouse;
+            select.innerHTML = list.map(s => `<option value="${s}">${s}</option>`).join('')
+                + '<option value="custom">Custom Strain...</option>';
+            if (initial && list.includes(initial)) {
+                select.value = initial;
+                custom.style.display = 'none';
+            } else if (initial) {
+                select.value = 'custom';
+                custom.style.display = 'block';
+                custom.value = initial;
+            } else {
+                select.value = list[0];
+                custom.style.display = 'none';
+            }
+            select.setAttribute('data-initial', '');
+        }
+
+        function initSpeciesStrain(groupEl) {
+            populateStrains(groupEl);
+            groupEl.querySelectorAll('.species-group .tile').forEach(tile => {
+                tile.addEventListener('click', () => {
+                    const species = tile.getAttribute('data-value');
+                    const d = SPECIES_DEFAULTS[species] || SPECIES_DEFAULTS.Mouse;
+                    const weightInput = groupEl.querySelector('.weight');
+                    if (weightInput) { weightInput.max = d.weightMax; weightInput.value = d.weight; }
+                    groupEl.querySelector('.strain').setAttribute('data-initial', '');
+                    populateStrains(groupEl);
+                });
+            });
+        }
+
+        // Build a titled result section
+        function sectionHtml(title, contentHtml) {
+            return `<div class="result-section"><div class="section-title">${title}</div><div class="section-body">${contentHtml}</div></div>`;
+        }
+
+        // Add an editable row to a timeline table
+        window.addTimelineRow = function(btn) {
+            const table = btn.previousElementSibling.querySelector('tbody') ||
+                          btn.parentElement.querySelector('.timeline-table tbody');
+            const tr = document.createElement('tr');
+            tr.className = 'tl-row';
+            tr.innerHTML = `
+                <td contenteditable="true" class="tl-day">Day —</td>
+                <td contenteditable="true" class="tl-phase">New step</td>
+                <td contenteditable="true" class="tl-activity">Describe the activity…</td>
+                <td class="tl-del" onclick="this.closest('tr').remove()">✕</td>`;
+            table.appendChild(tr);
+        };
+
+        window.handleStrainChange = function(selectElement) {
+            const container = selectElement.closest('.form-group');
+            const customInput = container.querySelector('.strain-custom');
+
+            if (selectElement.value === 'custom') {
+                customInput.style.display = 'block';
+                customInput.focus();
+            } else {
+                customInput.style.display = 'none';
+                customInput.value = '';
+            }
+        };
+
+        // Target organ is no longer a separate field — derive it from the
+        // selected toxicity endpoints (or the experimental paradigm) so the
+        // backend still receives it without a redundant input.
+        function deriveTargetOrgan(toxEndpoints, paradigm) {
+            const endpointOrgan = [
+                ['Hepatotoxicity', 'Liver'], ['Nephrotoxicity', 'Kidney'],
+                ['Cardiotoxicity', 'Heart'], ['Neurological', 'Brain']
+            ];
+            for (const [kw, organ] of endpointOrgan) {
+                if ((toxEndpoints || []).some(ep => ep.includes(kw))) return organ;
+            }
+            const paradigmOrgan = { Neuroscience: 'Brain', Cardiovascular: 'Heart', Metabolic: 'Liver' };
+            return paradigmOrgan[paradigm] || 'General';
+        }
+
+        function collectGroupsData() {
+            const groupsData = [];
+
+            document.querySelectorAll('.group-container').forEach((groupEl) => {
+                const strainSelect = groupEl.querySelector('.strain');
+                const strainCustom = groupEl.querySelector('.strain-custom');
+                const strainValue = strainSelect.value === 'custom' ? strainCustom.value : strainSelect.value;
+                const toxEndpoints = Array.from(groupEl.querySelectorAll('.tox-endpoint-cb:checked')).map(cb => cb.value);
+
+                groupsData.push({
+                    group_name: groupEl.querySelector('.group-name').value,
+                    drug_name: groupEl.querySelector('.drug-name').value,
+                    dose: groupEl.querySelector('.dose').value,
+                    species: groupEl.querySelector('.species')?.value || 'Mouse',
+                    strain: strainValue,
+                    sex: groupEl.querySelector('.sex').value,
+                    experiment_type: groupEl.querySelector('.experiment-type')?.value || '',
+                    toxicity_endpoints: toxEndpoints,
+                    target_organ: deriveTargetOrgan(toxEndpoints, groupEl.querySelector('.experiment-type')?.value),
+                    num_mice: groupEl.querySelector('.num-mice').value,
+                    weight: groupEl.querySelector('.weight').value,
+                    age: groupEl.querySelector('.age').value,
+                    route: groupEl.querySelector('.route').value,
+                    diet_type: groupEl.querySelector('.diet-type').value,
+                    start_date: groupEl.querySelector('.start-date').value,
+                    instructions: groupEl.querySelector('.instructions').value,
+                    sample_types: getSelectedSampleTypes(groupEl),
+                    blood_timepoints: groupEl.querySelector('.blood-timepoints')?.value || 1,
+                    blood_replicates: groupEl.querySelector('.blood-replicates')?.value || 1
+                });
+            });
+            
+            return groupsData;
+        }
+
+        // Analyze button
+        document.getElementById('analyze-btn').onclick = async function() {
+            const resultsContainer = document.getElementById('results-container');
+            resultsContainer.innerHTML = '';
+
+            showProgress(10, 'Validating input data...');
+
+            const studyTitle = document.getElementById('study-title').value;
+            const piName = document.getElementById('pi-name').value;
+            const groupsData = collectGroupsData();
+
+            try {
+                showProgress(30, 'Searching PubMed, Semantic Scholar, OpenAlex...');
+
+                const response = await fetch('/predict', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        study_title: studyTitle,
+                        pi_name: piName,
+                        groups: groupsData
+                    })
+                });
+
+                showProgress(60, 'Compiling estimates & references...');
+
+                if (!response.ok) {
+                    let msg = `Server error ${response.status}`;
+                    try {
+                        const errData = await response.json();
+                        if (errData.details) {
+                            // Flatten marshmallow validation messages into readable text
+                            const parts = [];
+                            const walk = (obj, path) => {
+                                if (Array.isArray(obj)) parts.push(`${path}: ${obj.join(', ')}`);
+                                else if (obj && typeof obj === 'object')
+                                    Object.entries(obj).forEach(([k, v]) => walk(v, path ? `${path}.${k}` : k));
+                            };
+                            walk(errData.details, '');
+                            if (parts.length) msg = `Please fix: ${parts.join(' | ')}`;
+                        } else if (errData.error) {
+                            msg = errData.error;
+                        }
+                    } catch (_) {}
+                    throw new Error(msg);
+                }
+
+                showProgress(80, 'Calculating blood quantities...');
+
+                const results = await response.json();
+
+                showProgress(100, 'Complete!');
+                setTimeout(hideProgress, 500);
+
+                // Display results
+                results.forEach(result => {
+                    const validationClass =
+                        result.validation_score >= 80 ? 'high' :
+                        result.validation_score >= 60 ? 'medium' : 'low';
+
+                    let resultHtml = `
+                        <div class="result-card">
+                            <h4>
+                                ${result.group_name}
+                                <span class="validation-badge ${validationClass}">
+                                    ${result.validation_score}/100
+                                </span>
+                                ${result.ml_prediction ? '<span class="ml-indicator">🤖 ML</span>' : ''}
+                            </h4>
+                    `;
+
+                    if (result.error) {
+                        resultHtml += `<div style="color: var(--danger); padding: 12px; background: #fee2e2; border-radius: 8px;">
+                            <strong>Error:</strong> ${result.error}
+                        </div>`;
+                    } else {
+                        // Clear, simple recommendation summary
+                        const s = result.summary || {};
+                        const speciesIcon = s.species === 'Rat' ? '🐀' : '🐭';
+                        const toxPct = s.toxicity_percentage;
+                        const toxColor = (toxPct == null) ? '#64748b' : toxPct >= 70 ? '#ef4444' : toxPct >= 45 ? '#f59e0b' : '#10b981';
+                        const toxText = (toxPct == null) ? '—' : `${toxPct}%`;
+                        const toxCat = s.toxicity_category ? ` <span style="font-size:0.75rem;text-transform:uppercase;">(${s.toxicity_category})</span>` : '';
+                        const samples = (s.samples && s.samples.length) ? s.samples.join(', ') : 'None selected';
+
+                        resultHtml += `
+                            <p style="margin:0 0 10px 0;"><strong>Drug:</strong> ${result.drug || 'N/A'}
+                                ${result.ncbi_link && result.ncbi_link !== '#' ?
+                                    ` <a href="${result.ncbi_link}" target="_blank" style="color: var(--info);">[PubChem]</a>` : ""}
+                            </p>
+                            <div class="summary-grid">
+                                <div class="summary-tile highlight">
+                                    <div class="stile-label">🔢 Recommended animals</div>
+                                    <div class="stile-value">${s.recommended_animals || result.recommended_mice || 'N/A'}</div>
+                                    <div class="stile-sub">you planned: ${s.planned_animals || 'N/A'} · ${s.species || 'Mouse'}</div>
+                                </div>
+                                <div class="summary-tile">
+                                    <div class="stile-label">${speciesIcon} Species</div>
+                                    <div class="stile-value" style="font-size:1.1rem;">${s.species || 'Mouse'}</div>
+                                    ${result.ml_prediction ? `<div class="stile-sub">ML: ${result.ml_prediction} ${s.animal_word || 'animals'}</div>` : ''}
+                                </div>
+                                <div class="summary-tile">
+                                    <div class="stile-label">⚖️ Weight</div>
+                                    <div class="stile-value">${s.planned_weight_g || 'N/A'} g</div>
+                                    <div class="stile-sub">standard: ${s.standard_weight || ''}</div>
+                                </div>
+                                <div class="summary-tile">
+                                    <div class="stile-label">📅 Age</div>
+                                    <div class="stile-value">${s.planned_age_weeks || 'N/A'} wk</div>
+                                    <div class="stile-sub">standard: ${s.standard_age || ''}</div>
+                                </div>
+                                <div class="summary-tile">
+                                    <div class="stile-label">☠️ Toxicity</div>
+                                    <div class="stile-value" style="color:${toxColor};">${toxText}${toxCat}</div>
+                                    ${s.ld50_mg_kg ? `<div class="stile-sub">LD50 ${s.ld50_mg_kg} mg/kg · ${s.toxicity_source === 'experimental' ? '📗 experimental data' : '📘 model estimate'}</div>` : ''}
+                                </div>
+                                <div class="summary-tile wide">
+                                    <div class="stile-label">🧫 Samples to collect</div>
+                                    <div class="stile-value" style="font-size:0.95rem;font-weight:600;">${samples}</div>
+                                    ${s.blood_volume_ml ? `<div class="stile-sub">blood needed: ${s.blood_volume_ml} mL ${s.blood_safe === false ? '⚠️ over safe limit' : '✓ within safe limit'}</div>` : ''}
+                                </div>
+                            </div>
+                        `;
+
+                        // SECTION: Biological Advice
+                        if (s.biological_advice && s.biological_advice.length) {
+                            resultHtml += sectionHtml('🧬 Biological Advice',
+                                `<ul class="sec-list">${s.biological_advice.map(a => `<li>${a}</li>`).join('')}</ul>`);
+                        }
+
+                        // SECTION: Experimental Timeline / Study Plan (EDITABLE)
+                        if (s.timeline && s.timeline.length) {
+                            const rows = s.timeline.map(t => `
+                                <tr class="tl-row">
+                                    <td contenteditable="true" class="tl-day">${t.day}</td>
+                                    <td contenteditable="true" class="tl-phase">${t.phase}</td>
+                                    <td contenteditable="true" class="tl-activity">${t.activity}</td>
+                                    <td class="tl-del" onclick="this.closest('tr').remove()">✕</td>
+                                </tr>`).join('');
+                            resultHtml += sectionHtml('🗓️ Experimental Timeline / Study Plan', `
+                                <p class="sec-note">Editable plan — click any cell to change it. From Day 1: acclimatize → ${(result.summary.timeline||[]).some(t=>t.phase==='Fasting')?'fast → ':''}dose → monitor → sample → endpoint.</p>
+                                <div style="overflow-x:auto;">
+                                    <table class="timeline-table" data-group="${(result.group_name||'').replace(/"/g,'')}">
+                                        <thead><tr><th>Day</th><th>Phase</th><th>Activity</th><th></th></tr></thead>
+                                        <tbody>${rows}</tbody>
+                                    </table>
+                                </div>
+                                <button type="button" class="tl-add-btn" onclick="addTimelineRow(this)">➕ Add step</button>
+                                <div style="margin-top:6px;">
+                                    <button type="button" class="plan-export-btn" onclick="downloadStudyPlan('pdf')">📄 Save plan as PDF</button>
+                                    <button type="button" class="plan-export-btn" onclick="downloadStudyPlan('docx')">📝 Save plan as Word</button>
+                                </div>`);
+                        }
+
+                        // SECTION: Toxicity & Humane Endpoints
+                        const w = s.welfare;
+                        if (w || s.toxicity_percentage != null) {
+                            let toxHtml = `<p style="margin:0 0 8px;"><strong>Toxicity:</strong>
+                                <span style="color:${toxColor};font-weight:700;">${toxText}</span>${toxCat}
+                                ${s.ld50_mg_kg ? '· LD50 ' + s.ld50_mg_kg + ' mg/kg · ' + (s.toxicity_source === 'experimental' ? '📗 experimental data' : '📘 model estimate') : ''}</p>`;
+                            if (w) {
+                                toxHtml += `
+                                    <div style="font-weight:700;font-size:0.85rem;margin:8px 0 4px;">🩺 Humane endpoints (stop criteria):</div>
+                                    <ul class="sec-list">${(w.humane_endpoints || []).map(e => `<li>${e}</li>`).join('')}</ul>
+                                    <div style="font-weight:700;font-size:0.85rem;margin:10px 0 4px;">⚕️ Pain / distress monitoring:</div>
+                                    <p class="sec-note" style="margin:0;">Level: <strong style="text-transform:uppercase;">${(w.monitoring || {}).level || ''}</strong> — ${(w.monitoring || {}).frequency || ''}<br>${(w.monitoring || {}).analgesia_guidance || ''}</p>`;
+                            }
+                            resultHtml += sectionHtml('☠️ Toxicity &amp; Humane Endpoints', toxHtml);
+                        }
+
+                        // SECTION: Tissue Sampling (always shown)
+                        let tissueHtml = `<p style="margin:0 0 6px;"><strong>Samples to collect:</strong> ${samples}</p>`;
+                        if (result.blood_calculation && result.blood_calculation.needed) {
+                            const blood = result.blood_calculation;
+                            const safeIcon = blood.safety_color === 'red' ? '⚠️' : '✓';
+                            tissueHtml += `
+                                <div style="margin-top:8px;padding:10px;border-radius:8px;background:${blood.safety_color === 'red' ? '#fee2e2' : '#f0fdf4'};font-size:0.86rem;">
+                                    <div><strong>💉 Blood volume needed:</strong> ${blood.total_volume_ml} mL (${blood.total_volume_ul} µL)</div>
+                                    <div><strong>Safe limit:</strong> ${blood.safe_volume_ml} mL · ${blood.percentage_of_total}% of total blood ${safeIcon}</div>
+                                    <div style="margin-top:3px;">${blood.safety_assessment}</div>
+                                </div>`;
+                        } else {
+                            tissueHtml += `<p class="sec-note" style="margin:0;">Select biological sample types in the group form to calculate safe blood-collection volumes.</p>`;
+                        }
+                        resultHtml += sectionHtml('🧫 Tissue Sampling', tissueHtml);
+
+                        // Scientific references & trusted sources (always visible)
+                        const src = result.all_sources || {};
+                        const dbList = [
+                            ['PubMed (NIH/NLM)', src.pubmed_count, 'https://pubmed.ncbi.nlm.nih.gov/'],
+                            ['Semantic Scholar', src.semantic_scholar_count, 'https://www.semanticscholar.org/'],
+                            ['Europe PMC', src.europe_pmc_count, 'https://europepmc.org/'],
+                            ['OpenAlex', src.openalex_count, 'https://openalex.org/'],
+                            ['CrossRef', src.crossref_count, 'https://www.crossref.org/'],
+                            ['IMPC (Mouse Phenotypes)', src.impc_count, 'https://www.mousephenotype.org/']
+                        ];
+                        resultHtml += `
+                            <div style="margin-top:16px;background:#f8fafc;border:1px solid var(--border);border-radius:12px;padding:14px;">
+                                <h5 style="margin:0 0 4px 0;color:#1e40af;">📚 Citations &amp; Sources (trusted databases)</h5>
+                                <p style="margin:0 0 10px 0;font-size:0.78rem;color:var(--muted);">
+                                    ${src.total_papers || 0} peer-reviewed records searched across reputable biomedical databases:
+                                </p>
+                                <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:${(result.reference_papers && result.reference_papers.length) ? '14px' : '0'};">
+                                    ${dbList.map(([name, count, url]) => `<a href="${url}" target="_blank" class="source-badge" style="text-decoration:none;">${name}: ${count || 0}</a>`).join('')}
+                                </div>
+                                ${(result.reference_papers && result.reference_papers.length) ? `
+                                    <div style="font-size:0.82rem;font-weight:700;margin-bottom:6px;">🔗 Related papers for this experiment (click to open):</div>
+                                    <ul style="margin:0;padding-left:18px;font-size:0.86rem;">
+                                        ${result.reference_papers.slice(0, 6).map(p => `
+                                            <li style="margin-bottom:9px;">
+                                                <a href="${p.url || p.pubmed_url || '#'}" target="_blank" style="color:var(--info);font-weight:600;">${p.title || 'Untitled'}</a>
+                                                <span style="color:var(--muted);font-size:0.8rem;"> — ${p.journal || p.venue || ''} ${p.year ? '(' + p.year + ')' : ''} ${p.citations ? '• ' + p.citations + ' citations' : ''} • <strong>${p.source || ''}</strong></span>
+                                            </li>`).join('')}
+                                    </ul>` :
+                                    '<p style="font-size:0.82rem;color:var(--muted);margin:0;">No specific papers matched this exact query — try a more specific drug name or target organ.</p>'}
+                            </div>
+                        `;
+
+                        resultHtml += `
+                            <hr style="border: none; border-top: 1px solid var(--border); margin: 16px 0;">
+                            <p><strong>📊 Power &amp; Sample Size — rationale:</strong></p>
+                            <div style="background: var(--card-accent); padding: 12px; border-radius: 8px; font-size: 0.9rem;">
+                                ${result.rationale || 'N/A'}
+                            </div>
+                        `;
+
+                        // Warnings
+                        if (result.warnings && result.warnings.length > 0) {
+                            resultHtml += `
+                                <div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 12px; margin: 12px 0; border-radius: 6px;">
+                                    <h5 style="margin: 0 0 8px 0;">⚠️ Warnings:</h5>
+                                    <ul style="margin: 0; padding-left: 20px;">
+                                        ${result.warnings.map(w => `<li>${w}</li>`).join('')}
+                                    </ul>
+                                </div>
+                            `;
+                        }
+                        // Planning-only note (reinforces scope, avoids over-claiming)
+                        resultHtml += `
+                            <div style="margin-top:14px;padding:10px 12px;background:#eff6ff;border:1px dashed #93c5fd;border-radius:8px;font-size:0.8rem;color:#1e40af;">
+                                📋 <strong>For planning only.</strong> Verify these figures against the cited sources above.
+                                This is a starting point, not a substitute for the actual experiment, pilot data, or IACUC review.
+                            </div>
+                        `;
+                    }
+
+                    resultHtml += `</div>`;
+                    resultsContainer.innerHTML += resultHtml;
+                });
+
+                resultsContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+            } catch (error) {
+                console.error('Analysis error:', error);
+                hideProgress();
+                
+                resultsContainer.innerHTML = `
+                    <div style="grid-column: 1 / -1; background: #fee2e2; border: 1px solid #fecaca; color: #991b1b; padding: 20px; border-radius: 12px;">
+                        <h4 style="margin: 0 0 8px 0;">❌ Error Occurred</h4>
+                        <p style="margin: 0;"><strong>Message:</strong> ${error.message}</p>
+                        <p style="margin: 8px 0 0 0;">Please check that the backend server is running and all fields are filled correctly.</p>
+                    </div>
+                `;
+            }
+        };
+
+        window.toggleCollapsible = function(header) {
+            const content = header.nextElementSibling;
+            const arrow = header.querySelector('span:last-child');
+            
+            content.classList.toggle('open');
+            arrow.textContent = content.classList.contains('open') ? '▲' : '▼';
+        };
+
+        // Export functions
+        async function downloadStudyPlan(format) {
+            const endpoint = format === 'pdf' ? '/study-plan/pdf' : '/study-plan/docx';
+            
+            // Gather any edited day-by-day timelines from the results
+            const timelines = Array.from(document.querySelectorAll('.timeline-table')).map(tbl => ({
+                group: tbl.getAttribute('data-group') || '',
+                steps: Array.from(tbl.querySelectorAll('tbody tr')).map(tr => ({
+                    day: (tr.querySelector('.tl-day')?.innerText || '').trim(),
+                    phase: (tr.querySelector('.tl-phase')?.innerText || '').trim(),
+                    activity: (tr.querySelector('.tl-activity')?.innerText || '').trim()
+                }))
+            }));
+
+            // Collect current form data
+            const studyData = {
+                study_title: document.getElementById('study-title').value || 'Untitled Study',
+                pi_name: document.getElementById('pi-name').value || 'Not specified',
+                institution: document.getElementById('institution').value || 'Not specified',
+                study_start_date: new Date().toISOString().split('T')[0],
+                groups: collectGroupsData(),
+                timelines: timelines
+            };
+            
+            // Validate that we have at least one group
+            if (studyData.groups.length === 0) {
+                alert('❌ Please add at least one experimental group before exporting.');
+                return;
+            }
+            
+            try {
+                showProgress(20, `Generating ${format.toUpperCase()}...`);
+                
+                const resp = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(studyData)
+                });
+                
+                showProgress(80, 'Finalizing document...');
+                
+                if (!resp.ok) {
+                    const errorData = await resp.json().catch(() => ({}));
+                    throw new Error(errorData.error || `Server returned ${resp.status}`);
+                }
+                
+                showProgress(100, 'Complete!');
+                
+                const blob = await resp.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = format === 'pdf' ? 'enhanced_study_plan.pdf' : 'enhanced_study_plan.docx';
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                window.URL.revokeObjectURL(url);
+                
+                setTimeout(hideProgress, 500);
+            } catch (e) {
+                console.error('Export error:', e);
+                hideProgress();
+                alert('❌ Export failed: ' + e.message);
+            }
+        }
+
+        document.getElementById('study-plan-pdf-btn').onclick = () => downloadStudyPlan('pdf');
+        document.getElementById('study-plan-docx-btn').onclick = () => downloadStudyPlan('docx');
+
+        // ============================================================
+        // NEW: Comprehensive Drug Analysis Functions
+        // ============================================================
+
+        async function analyzeComprehensiveDrug() {
+            const resultsContainer = document.getElementById('results-container');
+            resultsContainer.innerHTML = '';
+            
+            const groupsData = collectGroupsData();
+            if (groupsData.length === 0) {
+                alert('❌ Please add at least one experimental group.');
+                return;
+            }
+
+            const drugName = groupsData[0].drug_name;
+            if (!drugName) {
+                alert('❌ Please enter a drug name in at least one group.');
+                return;
+            }
+
+            try {
+                showProgress(5, 'Starting comprehensive analysis...');
+
+                for (let i = 0; i < groupsData.length; i++) {
+                    const group = groupsData[i];
+                    
+                    showProgress(10 + (i * 25), `Analyzing ${group.drug_name}...`);
+
+                    const payload = {
+                        drug_name: group.drug_name || 'Unknown',
+                        dose: parseFloat(group.dose) || 10,
+                        weight: parseFloat(group.weight) || 25,
+                        age: parseFloat(group.age) || 8,
+                        sex: group.sex || 'Mixed',
+                        route: group.route || 'Oral',
+                        target_organ: group.target_organ || 'General',
+                        diet_type: group.diet_type || 'Standard'
+                    };
+
+                    const response = await fetch('/analyze-drug-comprehensive', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`Server error: ${response.status}`);
+                    }
+
+                    const result = await response.json();
+                    displayComprehensiveDrugAnalysis(result, group);
+                }
+
+                showProgress(100, 'Complete!');
+                setTimeout(hideProgress, 500);
+                resultsContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+            } catch (error) {
+                console.error('Comprehensive analysis error:', error);
+                hideProgress();
+                resultsContainer.innerHTML = `
+                    <div style="grid-column: 1 / -1; background: #fee2e2; border: 1px solid #fecaca; color: #991b1b; padding: 20px; border-radius: 12px;">
+                        <h4 style="margin: 0 0 8px 0;">❌ Analysis Error</h4>
+                        <p style="margin: 0;"><strong>Message:</strong> ${error.message}</p>
+                        <p style="margin: 8px 0 0 0;">Please check that the backend server is running.</p>
+                    </div>
+                `;
+            }
+        }
+
+        function displayComprehensiveDrugAnalysis(result, groupData) {
+            const resultsContainer = document.getElementById('results-container');
+            
+            const toxicity = result.toxicity_percentage || 0;
+            const efficacy = result.efficiency_percentage || 0;
+            const safetyMargin = result.risk_benefit_analysis?.safety_margin || 0;
+            
+            let riskColor = '#10b981'; // green
+            if (safetyMargin < 10) riskColor = '#f59e0b'; // amber
+            if (safetyMargin < -10) riskColor = '#ef4444'; // red
+
+            let analysisHtml = `
+                <div class="comprehensive-analysis-card">
+                    <div class="analysis-header">
+                        <h3>🧬 ${result.drug_name}</h3>
+                        <span style="font-size: 0.9rem; color: var(--muted);">${new Date().toLocaleDateString()}</span>
+                    </div>
+
+                    <!-- Toxicity & Efficacy Scores -->
+                    <div class="score-row">
+                        <div class="score-card">
+                            <div class="score-label">☠️ Toxicity</div>
+                            <div class="score-percentage" style="color: ${toxicity > 60 ? '#ef4444' : toxicity > 40 ? '#f59e0b' : '#10b981'}">
+                                ${toxicity.toFixed(1)}%
+                            </div>
+                            <div class="progress-bar-comprehensive">
+                                <div class="progress-fill-toxicity" style="width: ${toxicity}%"></div>
+                            </div>
+                            <div class="score-interpretation">
+                                ${result.toxicity_score?.interpretation || 'Unknown'}
+                            </div>
+                            ${(() => {
+                                const ld50 = result.toxicity_score?.ld50_mg_kg;
+                                if (!ld50) return '';
+                                const src = result.toxicity_score?.ld50_source;
+                                const cat = result.toxicity_score?.ld50_category || '';
+                                const detail = result.toxicity_score?.ld50_source_detail || '';
+                                const badge = src === 'experimental'
+                                    ? '<span style="background:#dcfce7;color:#166534;padding:1px 6px;border-radius:6px;font-size:0.7rem;font-weight:600;">Experimental data</span>'
+                                    : '<span style="background:#e0e7ff;color:#3730a3;padding:1px 6px;border-radius:6px;font-size:0.7rem;font-weight:600;">ML model estimate</span>';
+                                return `<div style="margin-top:8px;font-size:0.8rem;color:var(--muted);">
+                                    <div><strong>LD50:</strong> ${ld50} mg/kg <span style="text-transform:uppercase;">(${cat})</span></div>
+                                    <div style="margin-top:3px;">${badge}</div>
+                                    ${detail ? `<div style="margin-top:3px;font-size:0.7rem;opacity:0.8;">${detail}</div>` : ''}
+                                </div>`;
+                            })()}
+                        </div>
+
+                        <div class="score-card">
+                            <div class="score-label">✅ Efficacy</div>
+                            <div class="score-percentage" style="color: ${efficacy > 60 ? '#10b981' : efficacy > 40 ? '#f59e0b' : '#ef4444'}">
+                                ${efficacy.toFixed(1)}%
+                            </div>
+                            <div class="progress-bar-comprehensive">
+                                <div class="progress-fill-efficacy" style="width: ${efficacy}%"></div>
+                            </div>
+                            <div class="score-interpretation">
+                                ${result.efficiency_score?.interpretation || 'Unknown'}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Safety Margin -->
+                    <div class="safety-margin-box" style="border-left-color: ${riskColor}">
+                        <div class="safety-margin-value" style="color: ${riskColor}">
+                            ${safetyMargin >= 0 ? '+' : ''}${safetyMargin.toFixed(1)}
+                        </div>
+                        <div class="safety-profile">
+                            ${result.risk_benefit_analysis?.profile || 'Unknown Profile'}
+                        </div>
+                        <div style="font-size: 0.9rem; color: var(--muted);">
+                            Safety Margin (Efficacy - Toxicity)
+                        </div>
+                    </div>
+
+                    <!-- Mouse Parameters -->
+                    <div style="margin: 20px 0;">
+                        <h5 style="margin: 0 0 12px 0; color: #667eea;">🐭 Mouse Parameters</h5>
+                        <div class="parameters-grid">
+                            <div class="parameter-item">
+                                <div class="parameter-label">Compound</div>
+                                <div class="parameter-value">${result.mouse_parameters?.compound || 'N/A'}</div>
+                            </div>
+                            <div class="parameter-item">
+                                <div class="parameter-label">Dose (mg/kg)</div>
+                                <div class="parameter-value">${result.mouse_parameters?.dose_mg_kg || 'N/A'}</div>
+                            </div>
+                            <div class="parameter-item">
+                                <div class="parameter-label">Weight (g)</div>
+                                <div class="parameter-value">${result.mouse_parameters?.weight_g || 'N/A'}</div>
+                            </div>
+                            <div class="parameter-item">
+                                <div class="parameter-label">Age (weeks)</div>
+                                <div class="parameter-value">${result.mouse_parameters?.age_weeks || 'N/A'}</div>
+                            </div>
+                            <div class="parameter-item">
+                                <div class="parameter-label">Sex</div>
+                                <div class="parameter-value">${result.mouse_parameters?.sex || 'N/A'}</div>
+                            </div>
+                            <div class="parameter-item">
+                                <div class="parameter-label">Route</div>
+                                <div class="parameter-value">${result.mouse_parameters?.route || 'N/A'}</div>
+                            </div>
+                            <div class="parameter-item">
+                                <div class="parameter-label">Target Organ</div>
+                                <div class="parameter-value">${result.mouse_parameters?.target_organ || 'N/A'}</div>
+                            </div>
+                            <div class="parameter-item">
+                                <div class="parameter-label">Diet Type</div>
+                                <div class="parameter-value">${result.mouse_parameters?.diet_type || 'N/A'}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Recommendations -->
+                    ${result.recommendations && result.recommendations.length > 0 ? `
+                        <div class="recommendations-box">
+                            <h5>💡 Recommendations</h5>
+                            <ul>
+                                ${result.recommendations.map(rec => `<li>${rec}</li>`).join('')}
+                            </ul>
+                        </div>
+                    ` : ''}
+
+                    <!-- IACUC Welfare: Humane Endpoints (Part 8) & Pain Monitoring (Part 11) -->
+                    ${result.welfare_recommendations ? (() => {
+                        const w = result.welfare_recommendations;
+                        const m = w.monitoring || {};
+                        const lvlColor = m.level === 'high' ? '#ef4444' : m.level === 'moderate' ? '#f59e0b' : '#10b981';
+                        return `
+                        <div style="margin-top:16px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:16px;">
+                            <h5 style="margin:0 0 4px 0;color:#1e40af;">🐭 Animal Welfare — for IACUC protocol (Parts 8 & 11)</h5>
+                            <p style="margin:0 0 12px 0;font-size:0.75rem;color:#64748b;font-style:italic;">${w.disclaimer || ''}</p>
+
+                            <div style="margin-bottom:12px;">
+                                <strong style="font-size:0.9rem;">🩺 Humane endpoints (Part 8):</strong>
+                                <ul style="margin:6px 0 0 0;padding-left:20px;font-size:0.85rem;">
+                                    ${(w.humane_endpoints || []).map(e => `<li style="margin-bottom:3px;">${e}</li>`).join('')}
+                                </ul>
+                            </div>
+
+                            <div style="background:#fff;border-radius:8px;padding:10px 12px;font-size:0.85rem;">
+                                <strong>⚕️ Pain / distress monitoring (Part 11):</strong>
+                                <div style="margin-top:6px;">Monitoring level:
+                                    <span style="color:${lvlColor};font-weight:700;text-transform:uppercase;">${m.level || ''}</span>
+                                </div>
+                                <div style="margin-top:3px;"><strong>Frequency:</strong> ${m.frequency || ''}</div>
+                                <div style="margin-top:3px;"><strong>Analgesia:</strong> ${m.analgesia_guidance || ''}</div>
+                                <div style="margin-top:3px;"><strong>Scoring:</strong> ${m.body_condition_scoring || ''}</div>
+                                <div style="margin-top:6px;color:#7c2d12;"><strong>When an endpoint is reached:</strong> ${w.response_when_endpoint_reached || ''}</div>
+                            </div>
+                        </div>`;
+                    })() : ''}
+
+                    <!-- Literature Section -->
+                    ${result.literature ? `
+                        <div class="literature-section">
+                            <h5>📚 Literature Sources</h5>
+                            ${Object.entries(result.literature).map(([source, data]) => `
+                                <div style="margin-bottom: 12px;">
+                                    <strong>${source}</strong>
+                                    ${data.count ? ` (${data.count} papers)` : ''}
+                                    <br>
+                                    ${data.link ? `<a href="${data.link}" target="_blank" class="literature-link">${source}</a>` : ''}
+                                </div>
+                            `).join('')}
+                        </div>
+                    ` : ''}
+
+                    <!-- Score Breakdown (Collapsible) -->
+                    <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #ddd;">
+                        <div class="collapsible-header" onclick="toggleCollapsible(this)">
+                            <span><strong>📊 Score Breakdown</strong></span>
+                            <span>▼</span>
+                        </div>
+                        <div class="collapsible-content">
+                            <div style="padding: 12px; background: #f9fafb; border-radius: 8px; font-size: 0.9rem;">
+                                <p><strong>Toxicity:</strong> Base ${result.toxicity_score?.base_score?.toFixed(1)}% → Adjusted ${result.toxicity_score?.adjusted_score?.toFixed(1)}%</p>
+                                <p><strong>Efficacy:</strong> Base ${result.efficiency_score?.base_score?.toFixed(1)}% → Adjusted ${result.efficiency_score?.adjusted_score?.toFixed(1)}%</p>
+                                <p><strong>Evidence:</strong> ${result.efficiency_score?.literature_evidence || 0} papers found</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            resultsContainer.innerHTML += analysisHtml;
+        }
+
+        // Add button event listener
+        document.getElementById('comprehensive-analyze-btn').onclick = analyzeComprehensiveDrug;
+
+        // Initialize
+        document.getElementById('add-group-btn').onclick = async () => {
+            // Ensure sample types are loaded before adding a group
+            if (!sampleTypesLoaded) {
+                await loadSampleTypes();
+            }
+            addGroup(false);
+        };
+        
+        // Add one control group by default - wait for sample types to load first
+        window.addEventListener('DOMContentLoaded', async () => {
+            // Load sample types first
+            await loadSampleTypes();
+            
+            // Then add control group with sample types available
+            addGroup(true);
+            
+            console.log('✅ Control group initialized with sample types');
+        });
+    </script>
+</body>
+</html>

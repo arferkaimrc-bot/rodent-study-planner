@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Workspace
+   version = "1.0">
+   <FileRef
+      location = "self:">
+   </FileRef>
+   <FileRef
+      location = "group:drug_assessment_section.html">
+   </FileRef>
+   <FileRef
+      location = "group:FEATURE_LOCATION_GUIDE.md">
+   </FileRef>
+   <FileRef
+      location = "group:QUICK_TEST.md">
+   </FileRef>
+   <FileRef
+      location = "group:INTEGRATION_INSTRUCTIONS.md">
+   </FileRef>
+   <FileRef
+      location = "group:button_integration_examples.html">
+   </FileRef>
+   <FileRef
+      location = "group:FINAL_SOLUTION.md">
+   </FileRef>
+</Workspace>

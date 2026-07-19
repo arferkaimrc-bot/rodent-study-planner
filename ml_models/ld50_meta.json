@@ -1,0 +1,21 @@
+{
+  "label": "ld50_neg_log10_mol_per_kg",
+  "species": "rat",
+  "route": "oral",
+  "descriptor_names": [
+    "molecular_weight",
+    "logp",
+    "h_donors",
+    "h_acceptors",
+    "rotatable_bonds",
+    "aromatic_rings",
+    "tpsa"
+  ],
+  "fp_bits": 256,
+  "fp_radius": 2,
+  "n_train": 6277,
+  "n_test": 1108,
+  "test_mae": 0.47886694736090296,
+  "test_r2": 0.5451989603336185,
+  "source": "TDC LD50_Zhu (Zhu et al. 2009)"
+}

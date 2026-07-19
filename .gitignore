@@ -1,0 +1,24 @@
+# Secrets — never commit
+neon_url.txt
+.env
+*.env
+
+# Local database & runtime
+*.db
+cache/
+app.log
+
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# OS / misc
+.DS_Store
+scratch_*.py
+STEPready-Complete.zip
+
+# Local-only (contain secrets / one-off)
+init_neon.py
+DEPLOY_GOOGLE.md
