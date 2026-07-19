@@ -151,6 +151,9 @@ def login():
         <button type="submit">Sign in</button>
       </form>
       <p class="sub" style="margin-top:16px">Accounts are created by the administrator.</p>
+      <p class="sub" style="margin-top:20px;text-align:center;font-size:0.78rem;border-top:1px solid #e2e8f0;padding-top:14px;">
+        Developed by <strong>Musaed AlSultan</strong> · 2026
+      </p>
     """
     return _page('Sign in', body)
 
