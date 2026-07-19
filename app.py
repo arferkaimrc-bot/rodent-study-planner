@@ -4735,6 +4735,18 @@ def analyze_drug_comprehensive():
         
         # Step 6: Retrieve literature from NCBI, EuropePMC
         literature = get_comprehensive_literature(drug_name, target_organ, efficiency_data)
+
+        # Also fetch REAL individual papers (title + link) so the UI can show
+        # clickable references, not just search links.
+        try:
+            _corpus = build_comprehensive_reference_corpus({
+                'drug_name': drug_name,
+                'target_organ': target_organ if target_organ and target_organ != 'General' else '',
+            })
+            reference_papers = _corpus.get('all_papers', [])[:8]
+        except Exception as e:
+            logger.warning(f"Comprehensive reference papers failed for {drug_name}: {e}")
+            reference_papers = []
         
         # Step 7: Generate risk-benefit analysis
         risk_benefit = generate_risk_benefit_analysis(
@@ -4787,6 +4799,7 @@ def analyze_drug_comprehensive():
                 dose, weight, age, sex, route, target_organ, diet_type
             ),
             'literature': literature,
+            'reference_papers': reference_papers,
             'risk_benefit_analysis': risk_benefit,
             'recommendations': generate_recommendations(toxicity_adjusted, efficiency_adjusted),
             'welfare_recommendations': welfare,

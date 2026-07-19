@@ -1832,19 +1832,28 @@
                     })() : ''}
 
                     <!-- Literature Section -->
-                    ${result.literature ? `
-                        <div class="literature-section">
-                            <h5>📚 Literature Sources</h5>
-                            ${Object.entries(result.literature).map(([source, data]) => `
-                                <div style="margin-bottom: 12px;">
-                                    <strong>${source}</strong>
-                                    ${data.count ? ` (${data.count} papers)` : ''}
-                                    <br>
-                                    ${data.link ? `<a href="${data.link}" target="_blank" class="literature-link">${source}</a>` : ''}
-                                </div>
-                            `).join('')}
-                        </div>
-                    ` : ''}
+                    <!-- Citations & Sources: real papers first, then search links -->
+                    <div class="literature-section">
+                        <h5>📚 Citations &amp; Sources</h5>
+                        ${(result.reference_papers && result.reference_papers.length) ? `
+                            <div style="font-size:0.82rem;font-weight:700;margin:4px 0 6px;">🔗 Related papers (click to open):</div>
+                            <ul style="margin:0 0 14px 0;padding-left:18px;font-size:0.86rem;">
+                                ${result.reference_papers.slice(0, 8).map(p => `
+                                    <li style="margin-bottom:9px;">
+                                        <a href="${p.url || p.pubmed_url || '#'}" target="_blank" class="literature-link" style="font-weight:600;">${p.title || 'Untitled'}</a>
+                                        <span style="color:var(--muted);font-size:0.8rem;"> — ${p.journal || p.venue || ''} ${p.year ? '(' + p.year + ')' : ''} ${p.citations ? '• ' + p.citations + ' citations' : ''} ${p.source ? '• ' + p.source : ''}</span>
+                                    </li>`).join('')}
+                            </ul>
+                        ` : '<p style="font-size:0.82rem;color:var(--muted);">No specific papers matched — see the source searches below.</p>'}
+                        ${result.literature ? `
+                            <div style="font-size:0.8rem;color:var(--muted);margin-bottom:4px;">Search these trusted databases:</div>
+                            <div style="display:flex;flex-wrap:wrap;gap:6px;">
+                                ${Object.entries(result.literature).map(([source, data]) =>
+                                    data.link ? `<a href="${data.link}" target="_blank" class="literature-link" style="border:1px solid var(--border);padding:4px 10px;border-radius:8px;text-decoration:none;">${source}${data.count ? ' (' + data.count + ')' : ''}</a>` : ''
+                                ).join('')}
+                            </div>
+                        ` : ''}
+                    </div>
 
                     <!-- Score Breakdown (Collapsible) -->
                     <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #ddd;">
