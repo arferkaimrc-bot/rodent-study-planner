@@ -1451,14 +1451,14 @@
                             </p>
                             <div class="summary-grid">
                                 <div class="summary-tile highlight">
-                                    <div class="stile-label">🔢 Recommended animals</div>
+                                    <div class="stile-label">🔢 Recommended animals per group</div>
                                     <div class="stile-value">${s.recommended_animals || result.recommended_mice || 'N/A'}</div>
-                                    <div class="stile-sub">you planned: ${s.planned_animals || 'N/A'} · ${s.species || 'Mouse'}</div>
+                                    <div class="stile-sub">you planned: ${s.planned_animals || 'N/A'}${result.ml_prediction ? ` · ML estimate: ${result.ml_prediction}` : ''}</div>
                                 </div>
                                 <div class="summary-tile">
                                     <div class="stile-label">${speciesIcon} Species</div>
                                     <div class="stile-value" style="font-size:1.1rem;">${s.species || 'Mouse'}</div>
-                                    ${result.ml_prediction ? `<div class="stile-sub">ML: ${result.ml_prediction} ${s.animal_word || 'animals'}</div>` : ''}
+                                    <div class="stile-sub">${s.strain || ''}</div>
                                 </div>
                                 <div class="summary-tile">
                                     <div class="stile-label">⚖️ Weight</div>

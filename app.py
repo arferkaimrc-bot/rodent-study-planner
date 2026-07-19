@@ -3116,6 +3116,7 @@ def get_prediction_and_suggestion(group, all_groups_count=1):
                 logger.warning(f"Welfare recommendation failed for {drug}: {e}")
         return {
             'species': species,
+            'strain': group.get('strain', ''),
             'animal_word': animal_word,
             'recommended_animals': recommended_range,
             'planned_animals': group.get('num_mice', ''),
