@@ -4985,15 +4985,16 @@ def get_drug_efficiency_from_literature(drug_name, target_organ, dose, route):
     try:
         search_term = f"{drug_name} {target_organ} efficacy mouse"
         
-        # NCBI Entrez
-        ncbi_url = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term={search_term}&retmax=5&rettype=json"
+        # NCBI Entrez (retmode=json is required for a JSON response)
+        ncbi_url = (f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
+                    f"?db=pubmed&term={requests.utils.quote(search_term)}&retmax=5&retmode=json")
         pubmed_count = 0
         try:
             response = requests.get(ncbi_url, timeout=10)
             if response.status_code == 200:
                 data = response.json()
                 pubmed_count = int(data.get('esearchresult', {}).get('count', 0))
-        except:
+        except Exception:
             pass
         
         # EuropePMC

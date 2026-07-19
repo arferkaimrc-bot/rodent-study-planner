@@ -271,6 +271,22 @@
             background: linear-gradient(180deg, #3b82f6, #2563eb);
         }
 
+        .drug-chip {
+            padding: 4px 10px;
+            border: 1px solid var(--primary-600);
+            background: rgba(38,166,91,0.08);
+            color: var(--primary-700);
+            border-radius: 999px;
+            font-size: 0.78rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all .12s ease;
+        }
+        .drug-chip:hover {
+            background: var(--primary);
+            color: #fff;
+        }
+
         .summary-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
@@ -1003,7 +1019,8 @@
                         
                         <div class="form-group">
                             <label>Drug Name: <span style="color: var(--danger);">*</span></label>
-                            <input type="text" class="drug-name" value="${drugName}" placeholder="e.g., Ibuprofen" required>
+                            <input type="text" class="drug-name" value="${drugName}" placeholder="e.g., Ibuprofen — or pick a suggestion below" required>
+                            <div class="drug-suggestions" style="margin-top:6px;display:flex;flex-wrap:wrap;gap:5px;"></div>
                         </div>
                         
                         <div class="form-group">
@@ -1127,6 +1144,7 @@
             const groupElement = document.getElementById(groupId);
             tileInit(groupElement);
             initSpeciesStrain(groupElement);
+            initParadigmSuggestions(groupElement);
             createSampleTypesSelector(groupElement, data?.sample_types || []);
         }
 
@@ -1135,6 +1153,40 @@
                 document.getElementById(groupId)?.remove();
             }
         };
+
+        // Suggested drugs/compounds per experimental paradigm (suggestions only —
+        // the user can still type any custom drug name).
+        const DRUG_SUGGESTIONS = {
+            Oncology: ['Doxorubicin', 'Cisplatin', 'Cyclophosphamide', 'Paclitaxel', '5-Fluorouracil', 'Methotrexate'],
+            Immunology: ['Dexamethasone', 'Cyclosporine', 'Rapamycin', 'Methotrexate', 'Lipopolysaccharide'],
+            Neuroscience: ['Diazepam', 'Haloperidol', 'Ketamine', 'Fluoxetine', 'Donepezil', 'MPTP'],
+            Metabolic: ['Metformin', 'Streptozotocin', 'Rosiglitazone', 'Insulin', 'Liraglutide'],
+            Cardiovascular: ['Isoproterenol', 'Doxorubicin', 'Captopril', 'Propranolol', 'Digoxin'],
+            Toxicology: ['Acetaminophen', 'Aspirin', 'Carbon tetrachloride', 'Cadmium chloride', 'Ethanol'],
+            Custom: []
+        };
+
+        function renderDrugSuggestions(groupEl) {
+            const paradigm = groupEl.querySelector('.experiment-type')?.value || 'Toxicology';
+            const box = groupEl.querySelector('.drug-suggestions');
+            if (!box) return;
+            const list = DRUG_SUGGESTIONS[paradigm] || [];
+            if (!list.length) { box.innerHTML = ''; return; }
+            box.innerHTML = `<span style="font-size:0.72rem;color:var(--muted);align-self:center;margin-right:2px;">💊 suggestions:</span>` +
+                list.map(d => `<button type="button" class="drug-chip" data-drug="${d}">${d}</button>`).join('');
+            box.querySelectorAll('.drug-chip').forEach(chip => {
+                chip.addEventListener('click', () => {
+                    groupEl.querySelector('.drug-name').value = chip.dataset.drug;
+                });
+            });
+        }
+
+        function initParadigmSuggestions(groupEl) {
+            renderDrugSuggestions(groupEl);
+            groupEl.querySelectorAll('.paradigm-group .tile').forEach(tile => {
+                tile.addEventListener('click', () => renderDrugSuggestions(groupEl));
+            });
+        }
 
         // Strain lists and default body weights per species
         const STRAINS = {
@@ -1780,16 +1832,17 @@
                         </div>
 
                         <div class="score-card">
-                            <div class="score-label">✅ Efficacy</div>
+                            <div class="score-label">📚 Literature Evidence</div>
                             <div class="score-percentage" style="color: ${efficacy > 60 ? '#10b981' : efficacy > 40 ? '#f59e0b' : '#ef4444'}">
-                                ${efficacy.toFixed(1)}%
+                                ${efficacy.toFixed(0)}%
                             </div>
                             <div class="progress-bar-comprehensive">
                                 <div class="progress-fill-efficacy" style="width: ${efficacy}%"></div>
                             </div>
                             <div class="score-interpretation">
-                                ${result.efficiency_score?.interpretation || 'Unknown'}
+                                ${result.efficiency_score?.literature_evidence != null ? result.efficiency_score.literature_evidence.toLocaleString() + ' publications found' : (result.efficiency_score?.interpretation || '')}
                             </div>
+                            <div style="font-size:0.72rem;color:var(--muted);margin-top:4px;">how much is published — not measured efficacy</div>
                         </div>
                     </div>
 
