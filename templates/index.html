@@ -1265,6 +1265,45 @@
         }
 
         // Analyze button
+        // Check required fields BEFORE sending, so the user gets a clear,
+        // field-specific message instead of a generic server error.
+        function validateGroups(groupsData) {
+            const problems = [];
+            if (!groupsData || groupsData.length === 0) {
+                problems.push('Please add at least one experimental group.');
+                return problems;
+            }
+            groupsData.forEach((g, i) => {
+                const name = g.group_name || `Group ${i + 1}`;
+                if (!g.drug_name || !g.drug_name.trim()) {
+                    problems.push(`<strong>${name}</strong>: enter a <strong>Drug Name</strong> (e.g., Aspirin — or "Saline" for a control group).`);
+                }
+                const n = parseInt(g.num_mice, 10);
+                if (!g.num_mice || isNaN(n) || n < 1) {
+                    problems.push(`<strong>${name}</strong>: enter <strong>Number of Animals</strong> (at least 1).`);
+                }
+                const dose = parseFloat(g.dose);
+                if (g.dose !== '' && g.dose != null && (isNaN(dose) || dose < 0)) {
+                    problems.push(`<strong>${name}</strong>: <strong>Dose</strong> must be a number ≥ 0.`);
+                }
+            });
+            return problems;
+        }
+
+        function showFieldErrors(problems) {
+            hideProgress();
+            const rc = document.getElementById('results-container');
+            rc.innerHTML = `
+                <div style="grid-column:1/-1;background:#fef3c7;border:1px solid #fcd34d;color:#92400e;padding:18px 20px;border-radius:12px;">
+                    <h4 style="margin:0 0 10px;">⚠️ Please complete these fields first</h4>
+                    <ul style="margin:0;padding-left:20px;line-height:1.8;">
+                        ${problems.map(p => `<li>${p}</li>`).join('')}
+                    </ul>
+                    <p style="margin:12px 0 0;font-size:0.85rem;">Fill the highlighted fields in the group form above, then click the button again.</p>
+                </div>`;
+            rc.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
         document.getElementById('analyze-btn').onclick = async function() {
             const resultsContainer = document.getElementById('results-container');
             resultsContainer.innerHTML = '';
@@ -1274,6 +1313,10 @@
             const studyTitle = document.getElementById('study-title').value;
             const piName = document.getElementById('pi-name').value;
             const groupsData = collectGroupsData();
+
+            // Field-level validation with clear messages
+            const problems = validateGroups(groupsData);
+            if (problems.length) { showFieldErrors(problems); return; }
 
             try {
                 showProgress(30, 'Searching PubMed, Semantic Scholar, OpenAlex...');
@@ -1616,16 +1659,10 @@
             resultsContainer.innerHTML = '';
             
             const groupsData = collectGroupsData();
-            if (groupsData.length === 0) {
-                alert('❌ Please add at least one experimental group.');
-                return;
-            }
+            const problems = validateGroups(groupsData);
+            if (problems.length) { showFieldErrors(problems); return; }
 
             const drugName = groupsData[0].drug_name;
-            if (!drugName) {
-                alert('❌ Please enter a drug name in at least one group.');
-                return;
-            }
 
             try {
                 showProgress(5, 'Starting comprehensive analysis...');
@@ -1653,7 +1690,24 @@
                     });
 
                     if (!response.ok) {
-                        throw new Error(`Server error: ${response.status}`);
+                        let msg = `Server error ${response.status}`;
+                        try {
+                            const errData = await response.json();
+                            if (errData.details) {
+                                const parts = [];
+                                const walk = (obj, path) => {
+                                    if (Array.isArray(obj)) parts.push(`${path}: ${obj.join(', ')}`);
+                                    else if (obj && typeof obj === 'object')
+                                        Object.entries(obj).forEach(([k, v]) => walk(v, path ? `${path}.${k}` : k));
+                                    else if (obj) parts.push(String(obj));
+                                };
+                                walk(errData.details, '');
+                                if (parts.length) msg = parts.join(' | ');
+                            } else if (errData.error) {
+                                msg = errData.error;
+                            }
+                        } catch (_) {}
+                        throw new Error(msg);
                     }
 
                     const result = await response.json();
