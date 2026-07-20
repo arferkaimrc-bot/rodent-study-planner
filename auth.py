@@ -68,6 +68,15 @@ def load_user(user_id):
     return db.session.get(User, int(user_id))
 
 
+class StudyDraft(db.Model):
+    """One saved work-in-progress study per user (save & resume later)."""
+    __tablename__ = 'study_drafts'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), unique=True, nullable=False, index=True)
+    data = db.Column(db.Text, nullable=False, default='{}')
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 # ---------------------------------------------------------------------------
 # Minimal styled pages (kept inline to avoid extra template files)
 # ---------------------------------------------------------------------------
@@ -314,6 +323,37 @@ def admin_reset(user_id):
     flash(f'Password for {u.email} reset. New password: {pw} '
           f'(the user can sign in with it directly).', 'ok')
     return redirect(url_for('auth.admin'))
+
+
+# ---------------------------------------------------------------------------
+# Save / resume a study draft (per user)
+# ---------------------------------------------------------------------------
+@auth_bp.route('/draft/save', methods=['POST'])
+@login_required
+def draft_save():
+    import json as _json
+    payload = request.get_json(silent=True) or {}
+    draft = StudyDraft.query.filter_by(user_id=current_user.id).first()
+    if not draft:
+        draft = StudyDraft(user_id=current_user.id)
+        db.session.add(draft)
+    draft.data = _json.dumps(payload)[:500000]  # cap size for safety
+    db.session.commit()
+    return {'ok': True, 'saved_at': draft.updated_at.isoformat() if draft.updated_at else None}
+
+
+@auth_bp.route('/draft/load', methods=['GET'])
+@login_required
+def draft_load():
+    import json as _json
+    draft = StudyDraft.query.filter_by(user_id=current_user.id).first()
+    if not draft:
+        return {'ok': True, 'data': None}
+    try:
+        return {'ok': True, 'data': _json.loads(draft.data),
+                'updated_at': draft.updated_at.isoformat() if draft.updated_at else None}
+    except Exception:
+        return {'ok': True, 'data': None}
 
 
 # ---------------------------------------------------------------------------

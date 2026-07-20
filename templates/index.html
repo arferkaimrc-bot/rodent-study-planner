@@ -388,7 +388,7 @@
 
         .sample-types-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
             gap: 8px;
             margin-top: 8px;
             max-height: 200px;
@@ -401,11 +401,19 @@
 
         .sample-checkbox {
             display: flex;
-            align-items: center;
+            align-items: flex-start;
             gap: 8px;
             padding: 6px;
             cursor: pointer;
             border-radius: 6px;
+        }
+        .sample-checkbox input[type="checkbox"] { flex: 0 0 auto; margin-top: 3px; }
+        .sample-checkbox span {
+            flex: 1 1 auto;
+            min-width: 0;
+            white-space: normal;
+            overflow-wrap: break-word;
+            font-size: 0.9rem;
         }
 
         .sample-checkbox:hover {
@@ -803,10 +811,6 @@
 
         /* Prevent any horizontal overflow of the whole page */
         html, body { max-width: 100%; overflow-x: hidden; }
-        .sample-checkbox span, .sample-checkbox label {
-            white-space: normal;
-            word-break: break-word;
-        }
 
     </style>
 </head>
@@ -873,6 +877,8 @@
         <!-- Controls -->
         <div style="display: flex; gap: 12px; flex-wrap: wrap; margin: 24px 0;">
             <button id="add-group-btn">➕ Add Treatment Group</button>
+            <button id="save-draft-btn" style="background: linear-gradient(180deg, #f59e0b, #d97706);">💾 Save Draft</button>
+            <button id="resume-draft-btn" style="background: linear-gradient(180deg, #64748b, #475569);">📂 Resume Draft</button>
             <button id="study-plan-pdf-btn" style="background: linear-gradient(180deg, #3b82f6, #2563eb);">📄 Export PDF</button>
             <button id="study-plan-docx-btn" style="background: linear-gradient(180deg, #3b82f6, #2563eb);">📝 Export Word</button>
         </div>
@@ -1545,6 +1551,11 @@
                                 ${result.ncbi_link && result.ncbi_link !== '#' ?
                                     ` <a href="${result.ncbi_link}" target="_blank" style="color: var(--info);">[PubChem]</a>` : ""}
                             </p>
+                            ${(s.drug_overview && s.drug_overview.description) ? `
+                                <div style="margin:0 0 12px 0;padding:10px 12px;background:#f8fafc;border:1px solid var(--border);border-radius:10px;font-size:0.85rem;">
+                                    <strong>🔬 About this compound:</strong> ${s.drug_overview.description}
+                                    ${s.drug_overview.reference_url ? ` <a href="${s.drug_overview.reference_url}" target="_blank" style="color:var(--info);">[reference]</a>` : ''}
+                                </div>` : ''}
                             <div class="summary-grid">
                                 <div class="summary-tile highlight">
                                     <div class="stile-label">🔢 Recommended animals per group</div>
@@ -1811,6 +1822,39 @@
 
         document.getElementById('study-plan-pdf-btn').onclick = () => downloadStudyPlan('pdf');
         document.getElementById('study-plan-docx-btn').onclick = () => downloadStudyPlan('docx');
+
+        // Save / resume a work-in-progress study (per user)
+        async function saveDraft() {
+            const payload = {
+                study_title: document.getElementById('study-title').value,
+                pi_name: document.getElementById('pi-name').value,
+                institution: document.getElementById('institution').value,
+                groups: collectGroupsData()
+            };
+            try {
+                const r = await fetch('/draft/save', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                if (r.ok) alert('✅ Your work is saved. You can close the page and resume later with "Resume Draft".');
+                else alert('❌ Could not save. Please make sure you are signed in.');
+            } catch (e) { alert('❌ Save failed: ' + e.message); }
+        }
+        async function resumeDraft() {
+            try {
+                const r = await fetch('/draft/load');
+                const d = await r.json();
+                if (!d.data || !d.data.groups || !d.data.groups.length) { alert('No saved draft found yet. Fill the form and click "Save Draft" first.'); return; }
+                document.getElementById('study-title').value = d.data.study_title || '';
+                document.getElementById('pi-name').value = d.data.pi_name || '';
+                document.getElementById('institution').value = d.data.institution || '';
+                document.getElementById('groups-area').innerHTML = '';
+                groupCount = 0;
+                d.data.groups.forEach((g, i) => addGroup(i === 0, g));
+                const when = d.updated_at ? new Date(d.updated_at).toLocaleString() : '';
+                alert('✅ Draft loaded' + (when ? ' (saved ' + when + ')' : '') + '. Continue where you left off.');
+                document.getElementById('groups-area').scrollIntoView({ behavior: 'smooth', block: 'start' });
+            } catch (e) { alert('❌ Load failed: ' + e.message); }
+        }
+        document.getElementById('save-draft-btn').onclick = saveDraft;
+        document.getElementById('resume-draft-btn').onclick = resumeDraft;
 
         // ============================================================
         // NEW: Comprehensive Drug Analysis Functions

@@ -3020,6 +3020,36 @@ def recommend_statistical_test(num_groups: int, repeated_measures: bool = False)
     return recommendations
 
 
+def get_compound_summary(drug_name, cid=None):
+    """A brief plain-language description of the compound from PubChem (cached),
+    with a citable reference URL. Used to give the researcher a quick overview."""
+    ck = {'drug': (drug_name or '').lower(), 'type': 'desc'}
+    cached = api_cache.get('pubchem_desc', ck)
+    if cached:
+        return cached
+    result = {'description': '', 'reference_url': ''}
+    try:
+        if cid is None:
+            cd = get_drug_data_from_ncbi(drug_name)
+            cid = cd.get('cid') if cd.get('success') else None
+        if not cid:
+            return result
+        result['reference_url'] = f"https://pubchem.ncbi.nlm.nih.gov/compound/{cid}"
+        r = requests.get(f"{Config.PUBCHEM_API_BASE}/compound/cid/{cid}/description/JSON", timeout=8)
+        if r.status_code == 200:
+            for info in r.json().get('InformationList', {}).get('Information', []):
+                if info.get('Description'):
+                    result['description'] = info['Description']
+                    if info.get('DescriptionURL'):
+                        result['reference_url'] = info['DescriptionURL']
+                    break
+    except Exception as e:
+        logger.warning(f"Compound description failed for {drug_name}: {e}")
+    if result['description']:
+        api_cache.set('pubchem_desc', ck, result)
+    return result
+
+
 def build_protocol_timeline(group, animal_word='mice'):
     """
     Generate a day-by-day experimental protocol as an editable STARTING POINT
@@ -3159,9 +3189,18 @@ def get_prediction_and_suggestion(group, all_groups_count=1):
         # de-duplicate, preserve order
         recommended_samples = list(dict.fromkeys(rec_samples))
 
+        # Brief compound overview + reference (skip for controls)
+        drug_overview = None
+        if not is_control:
+            try:
+                drug_overview = get_compound_summary(drug)
+            except Exception as e:
+                logger.warning(f"Compound overview failed for {drug}: {e}")
+
         return {
             'species': species,
             'strain': group.get('strain', ''),
+            'drug_overview': drug_overview,
             'animal_word': animal_word,
             'recommended_samples': recommended_samples,
             'recommended_animals': recommended_range,
