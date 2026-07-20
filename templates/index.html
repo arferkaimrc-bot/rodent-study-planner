@@ -400,20 +400,21 @@
         }
 
         .sample-checkbox {
-            display: flex;
-            align-items: flex-start;
+            display: grid;
+            grid-template-columns: auto 1fr;   /* checkbox + text column that fills width */
+            align-items: start;
             gap: 8px;
             padding: 6px;
             cursor: pointer;
             border-radius: 6px;
         }
-        .sample-checkbox input[type="checkbox"] { flex: 0 0 auto; margin-top: 3px; }
+        .sample-checkbox input[type="checkbox"] { margin-top: 3px; }
         .sample-checkbox span {
-            flex: 1 1 auto;
             min-width: 0;
             white-space: normal;
             overflow-wrap: break-word;
             font-size: 0.9rem;
+            line-height: 1.3;
         }
 
         .sample-checkbox:hover {
