@@ -242,6 +242,9 @@
             font-size: 0.95rem;
             color: #0f172a;
         }
+        .section-title::-webkit-details-marker { display: none; }
+        details.result-section > summary { list-style: none; }
+        details.result-section[open] > summary span:last-child { opacity: 0; }
         .section-body { padding: 12px 14px; }
         .sec-list { margin: 0; padding-left: 20px; font-size: 0.88rem; }
         .sec-list li { margin-bottom: 5px; }
@@ -833,10 +836,9 @@
             <button id="study-plan-docx-btn" style="background: linear-gradient(180deg, #3b82f6, #2563eb);">📝 Export Word</button>
         </div>
 
-        <!-- Main analyze button -->
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 24px;">
-            <button id="analyze-btn">🔬 Analyze & Get ML-Powered Recommendations</button>
-            <button id="comprehensive-analyze-btn" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none;">🧬 Comprehensive Drug Analysis </button>
+        <!-- Main analyze button (single) -->
+        <div style="margin-bottom: 24px;">
+            <button id="analyze-btn" style="width:100%;font-size:1.05rem;padding:16px;">🔬 Analyze Study — Recommendations &amp; References</button>
         </div>
 
         <!-- Progress indicator -->
@@ -1010,6 +1012,9 @@
                                 <button type="button" class="tile" data-value="Toxicology">🧪 Toxicology</button>
                                 <button type="button" class="tile" data-value="Custom">✨ Custom</button>
                             </div>
+                            <input type="text" class="paradigm-custom" placeholder="Type your custom paradigm / study type…"
+                                   style="display:none; margin-top:8px;"
+                                   value="${(data?.experiment_type && !['Oncology','Immunology','Neuroscience','Metabolic','Cardiovascular','Toxicology','Custom'].includes(data.experiment_type)) ? data.experiment_type : ''}">
                         </div>
 
                         <div class="form-group">
@@ -1104,12 +1109,20 @@
                         <div class="form-group" style="grid-column: 1 / -1;">
                             <label>🧪 Toxicity Endpoints to Assess:</label>
                             <div class="tox-endpoints-grid">
-                                ${['Hepatotoxicity (ALT/AST)','Nephrotoxicity (BUN/Creatinine)','Cardiotoxicity (Troponin/ECG)','Neurological / Grimace Score','Weight fluctuation curves','Histopathology assessment'].map(ep => `
-                                    <label class="tox-endpoint">
-                                        <input type="checkbox" class="tox-endpoint-cb" value="${ep}"
-                                            ${(data?.toxicity_endpoints || []).includes(ep) ? 'checked' : ''}>
-                                        <span>${ep}</span>
-                                    </label>`).join('')}
+                                ${(() => {
+                                    const std = ['Hepatotoxicity (ALT/AST)','Nephrotoxicity (BUN/Creatinine)','Cardiotoxicity (Troponin/ECG)','Neurological / Grimace Score','Weight fluctuation curves','Histopathology assessment'];
+                                    const chosen = data?.toxicity_endpoints || [];
+                                    const extras = chosen.filter(e => !std.includes(e)); // custom ones
+                                    return std.concat(extras).map(ep => `
+                                        <label class="tox-endpoint">
+                                            <input type="checkbox" class="tox-endpoint-cb" value="${ep}" ${chosen.includes(ep) ? 'checked' : ''}>
+                                            <span>${ep}</span>
+                                        </label>`).join('');
+                                })()}
+                            </div>
+                            <div style="display:flex; gap:6px; margin-top:8px;">
+                                <input type="text" class="tox-endpoint-custom" placeholder="Add another endpoint…" style="flex:1; min-width:120px;">
+                                <button type="button" class="tl-add-btn" style="margin:0;" onclick="addCustomEndpoint(this)">➕ Add</button>
                             </div>
                         </div>
 
@@ -1181,10 +1194,22 @@
             });
         }
 
+        function toggleParadigmCustom(groupEl) {
+            const paradigm = groupEl.querySelector('.experiment-type')?.value;
+            const custom = groupEl.querySelector('.paradigm-custom');
+            if (!custom) return;
+            if (paradigm === 'Custom') { custom.style.display = 'block'; }
+            else { custom.style.display = 'none'; }
+        }
+
         function initParadigmSuggestions(groupEl) {
             renderDrugSuggestions(groupEl);
+            toggleParadigmCustom(groupEl);
             groupEl.querySelectorAll('.paradigm-group .tile').forEach(tile => {
-                tile.addEventListener('click', () => renderDrugSuggestions(groupEl));
+                tile.addEventListener('click', () => {
+                    renderDrugSuggestions(groupEl);
+                    toggleParadigmCustom(groupEl);
+                });
             });
         }
 
@@ -1235,11 +1260,36 @@
         }
 
         // Build a titled result section
-        function sectionHtml(title, contentHtml) {
-            return `<div class="result-section"><div class="section-title">${title}</div><div class="section-body">${contentHtml}</div></div>`;
+        // Collapsible detail section (collapsed by default → keeps results concise;
+        // click the header to expand the details).
+        function sectionHtml(title, contentHtml, open) {
+            return `<details class="result-section"${open ? ' open' : ''}>
+                <summary class="section-title" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;">
+                    <span>${title}</span><span style="font-size:0.8rem;color:var(--muted);font-weight:400;">tap to expand ▾</span>
+                </summary>
+                <div class="section-body">${contentHtml}</div>
+            </details>`;
         }
 
         // Add an editable row to a timeline table
+        // Add a custom toxicity endpoint (checked) to the group's grid
+        window.addCustomEndpoint = function(btn) {
+            const wrap = btn.closest('.form-group');
+            const input = wrap.querySelector('.tox-endpoint-custom');
+            const grid = wrap.querySelector('.tox-endpoints-grid');
+            const val = (input.value || '').trim();
+            if (!val) return;
+            // avoid duplicates
+            const exists = Array.from(grid.querySelectorAll('.tox-endpoint-cb')).some(cb => cb.value.toLowerCase() === val.toLowerCase());
+            if (!exists) {
+                const label = document.createElement('label');
+                label.className = 'tox-endpoint';
+                label.innerHTML = `<input type="checkbox" class="tox-endpoint-cb" value="${val.replace(/"/g,'')}" checked><span>${val}</span>`;
+                grid.appendChild(label);
+            }
+            input.value = '';
+        };
+
         window.addTimelineRow = function(btn) {
             const table = btn.previousElementSibling.querySelector('tbody') ||
                           btn.parentElement.querySelector('.timeline-table tbody');
@@ -1289,6 +1339,11 @@
                 const strainCustom = groupEl.querySelector('.strain-custom');
                 const strainValue = strainSelect.value === 'custom' ? strainCustom.value : strainSelect.value;
                 const toxEndpoints = Array.from(groupEl.querySelectorAll('.tox-endpoint-cb:checked')).map(cb => cb.value);
+                let paradigmValue = groupEl.querySelector('.experiment-type')?.value || '';
+                if (paradigmValue === 'Custom') {
+                    const pc = (groupEl.querySelector('.paradigm-custom')?.value || '').trim();
+                    if (pc) paradigmValue = pc;
+                }
 
                 groupsData.push({
                     group_name: groupEl.querySelector('.group-name').value,
@@ -1297,7 +1352,7 @@
                     species: groupEl.querySelector('.species')?.value || 'Mouse',
                     strain: strainValue,
                     sex: groupEl.querySelector('.sex').value,
-                    experiment_type: groupEl.querySelector('.experiment-type')?.value || '',
+                    experiment_type: paradigmValue,
                     toxicity_endpoints: toxEndpoints,
                     target_organ: deriveTargetOrgan(toxEndpoints, groupEl.querySelector('.experiment-type')?.value),
                     num_mice: groupEl.querySelector('.num-mice').value,
@@ -1471,14 +1526,25 @@
                                     <div class="stile-sub">standard: ${s.standard_age || ''}</div>
                                 </div>
                                 <div class="summary-tile">
+                                    <div class="stile-label">💉 Route / Diet</div>
+                                    <div class="stile-value" style="font-size:1.05rem;">${s.route || 'Oral'}</div>
+                                    <div class="stile-sub">diet: ${s.diet_type || 'Standard'}</div>
+                                </div>
+                                <div class="summary-tile">
                                     <div class="stile-label">☠️ Toxicity</div>
                                     <div class="stile-value" style="color:${toxColor};">${toxText}${toxCat}</div>
                                     ${s.ld50_mg_kg ? `<div class="stile-sub">LD50 ${s.ld50_mg_kg} mg/kg · ${s.toxicity_source === 'experimental' ? '📗 experimental data' : '📘 model estimate'}</div>` : ''}
                                 </div>
+                                <div class="summary-tile">
+                                    <div class="stile-label">🎯 Focus</div>
+                                    <div class="stile-value" style="font-size:1.05rem;">${s.target_organ && s.target_organ !== 'General' ? s.target_organ : (s.experiment_type || 'General')}</div>
+                                    <div class="stile-sub">${(s.toxicity_endpoints && s.toxicity_endpoints.length) ? s.toxicity_endpoints.length + ' endpoint(s)' : 'no endpoints selected'}</div>
+                                </div>
                                 <div class="summary-tile wide">
-                                    <div class="stile-label">🧫 Samples to collect</div>
+                                    <div class="stile-label">🧫 Samples to collect${s.target_organ && s.target_organ !== 'General' ? ' (focus: ' + s.target_organ + ')' : ''}</div>
                                     <div class="stile-value" style="font-size:0.95rem;font-weight:600;">${samples}</div>
                                     ${s.blood_volume_ml ? `<div class="stile-sub">blood needed: ${s.blood_volume_ml} mL ${s.blood_safe === false ? '⚠️ over safe limit' : '✓ within safe limit'}</div>` : ''}
+                                    ${(s.toxicity_endpoints && s.toxicity_endpoints.length) ? `<div class="stile-sub">endpoints: ${s.toxicity_endpoints.join(', ')}</div>` : ''}
                                 </div>
                             </div>
                         `;
@@ -1555,35 +1621,27 @@
                             ['CrossRef', src.crossref_count, 'https://www.crossref.org/'],
                             ['IMPC (Mouse Phenotypes)', src.impc_count, 'https://www.mousephenotype.org/']
                         ];
-                        resultHtml += `
-                            <div style="margin-top:16px;background:#f8fafc;border:1px solid var(--border);border-radius:12px;padding:14px;">
-                                <h5 style="margin:0 0 4px 0;color:#1e40af;">📚 Citations &amp; Sources (trusted databases)</h5>
-                                <p style="margin:0 0 10px 0;font-size:0.78rem;color:var(--muted);">
-                                    ${src.total_papers || 0} peer-reviewed records searched across reputable biomedical databases:
-                                </p>
-                                <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:${(result.reference_papers && result.reference_papers.length) ? '14px' : '0'};">
-                                    ${dbList.map(([name, count, url]) => `<a href="${url}" target="_blank" class="source-badge" style="text-decoration:none;">${name}: ${count || 0}</a>`).join('')}
-                                </div>
-                                ${(result.reference_papers && result.reference_papers.length) ? `
-                                    <div style="font-size:0.82rem;font-weight:700;margin-bottom:6px;">🔗 Related papers for this experiment (click to open):</div>
-                                    <ul style="margin:0;padding-left:18px;font-size:0.86rem;">
-                                        ${result.reference_papers.slice(0, 6).map(p => `
-                                            <li style="margin-bottom:9px;">
-                                                <a href="${p.url || p.pubmed_url || '#'}" target="_blank" style="color:var(--info);font-weight:600;">${p.title || 'Untitled'}</a>
-                                                <span style="color:var(--muted);font-size:0.8rem;"> — ${p.journal || p.venue || ''} ${p.year ? '(' + p.year + ')' : ''} ${p.citations ? '• ' + p.citations + ' citations' : ''} • <strong>${p.source || ''}</strong></span>
-                                            </li>`).join('')}
-                                    </ul>` :
-                                    '<p style="font-size:0.82rem;color:var(--muted);margin:0;">No specific papers matched this exact query — try a more specific drug name or target organ.</p>'}
+                        resultHtml += sectionHtml('📚 Citations &amp; Sources', `
+                            <p style="margin:0 0 10px 0;font-size:0.78rem;color:var(--muted);">
+                                ${src.total_papers || 0} peer-reviewed records searched across reputable biomedical databases:
+                            </p>
+                            <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:${(result.reference_papers && result.reference_papers.length) ? '14px' : '0'};">
+                                ${dbList.map(([name, count, url]) => `<a href="${url}" target="_blank" class="source-badge" style="text-decoration:none;">${name}: ${count || 0}</a>`).join('')}
                             </div>
-                        `;
+                            ${(result.reference_papers && result.reference_papers.length) ? `
+                                <div style="font-size:0.82rem;font-weight:700;margin-bottom:6px;">🔗 Related papers (click to open):</div>
+                                <ul style="margin:0;padding-left:18px;font-size:0.86rem;">
+                                    ${result.reference_papers.slice(0, 6).map(p => `
+                                        <li style="margin-bottom:9px;">
+                                            <a href="${p.url || p.pubmed_url || '#'}" target="_blank" style="color:var(--info);font-weight:600;">${p.title || 'Untitled'}</a>
+                                            <span style="color:var(--muted);font-size:0.8rem;"> — ${p.journal || p.venue || ''} ${p.year ? '(' + p.year + ')' : ''} ${p.citations ? '• ' + p.citations + ' citations' : ''} • <strong>${p.source || ''}</strong></span>
+                                        </li>`).join('')}
+                                </ul>` :
+                                '<p style="font-size:0.82rem;color:var(--muted);margin:0;">No specific papers matched — try a more specific drug or organ.</p>'}
+                        `);
 
-                        resultHtml += `
-                            <hr style="border: none; border-top: 1px solid var(--border); margin: 16px 0;">
-                            <p><strong>📊 Power &amp; Sample Size — rationale:</strong></p>
-                            <div style="background: var(--card-accent); padding: 12px; border-radius: 8px; font-size: 0.9rem;">
-                                ${result.rationale || 'N/A'}
-                            </div>
-                        `;
+                        resultHtml += sectionHtml('📊 Power &amp; Sample Size — rationale',
+                            `<div style="font-size:0.9rem;">${result.rationale || 'N/A'}</div>`);
 
                         // Warnings
                         if (result.warnings && result.warnings.length > 0) {
@@ -1983,7 +2041,7 @@
         }
 
         // Add button event listener
-        document.getElementById('comprehensive-analyze-btn').onclick = analyzeComprehensiveDrug;
+        // (comprehensive button merged into the single Analyze button)
 
         // Initialize
         document.getElementById('add-group-btn').onclick = async () => {
