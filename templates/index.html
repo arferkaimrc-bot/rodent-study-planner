@@ -1438,8 +1438,8 @@
                     problems.push(`<strong>${name}</strong>: enter <strong>Number of Animals</strong> (at least 1).`);
                 }
                 const dose = parseFloat(g.dose);
-                if (g.dose !== '' && g.dose != null && (isNaN(dose) || dose < 0)) {
-                    problems.push(`<strong>${name}</strong>: <strong>Dose</strong> must be a number ≥ 0.`);
+                if (g.dose === '' || g.dose == null || isNaN(dose) || dose < 0) {
+                    problems.push(`<strong>${name}</strong>: enter a <strong>Dose (mg/kg)</strong> — use <strong>0</strong> if this group gets no drug (e.g., a control).`);
                 }
             });
             return problems;
@@ -1640,7 +1640,7 @@
                                 <div style="margin-top:6px;">
                                     <button type="button" class="plan-export-btn" onclick="downloadStudyPlan('pdf')">📄 Save plan as PDF</button>
                                     <button type="button" class="plan-export-btn" onclick="downloadStudyPlan('docx')">📝 Save plan as Word</button>
-                                </div>`);
+                                </div>`, true);
                         }
 
                         // SECTION: Toxicity & Humane Endpoints
