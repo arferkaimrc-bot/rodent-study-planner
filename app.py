@@ -2815,13 +2815,32 @@ def build_comprehensive_reference_corpus(group):
     """Build comprehensive reference corpus from ALL sources."""
     logger.info(f"Building comprehensive reference corpus for {group.get('drug_name', 'unknown')}")
     
-    # Search all APIs in parallel (simplified here for clarity)
-    pubmed_refs = search_pubmed_articles(group, max_results=5)
-    europe_refs = search_europe_pmc(group, max_results=3)
-    semantic_refs = search_semantic_scholar(group, max_results=5)
-    openalex_refs = search_openalex(group, max_results=5)
-    crossref_refs = search_crossref(group, max_results=3)
-    impc_refs = search_impc(group, max_results=3)
+    # Search all APIs CONCURRENTLY so total time ≈ the slowest single call
+    # (not the sum). One slow/failing database no longer stalls the request.
+    from concurrent.futures import ThreadPoolExecutor
+    _tasks = {
+        'pubmed':   lambda: search_pubmed_articles(group, max_results=5),
+        'europe':   lambda: search_europe_pmc(group, max_results=3),
+        'semantic': lambda: search_semantic_scholar(group, max_results=5),
+        'openalex': lambda: search_openalex(group, max_results=5),
+        'crossref': lambda: search_crossref(group, max_results=3),
+        'impc':     lambda: search_impc(group, max_results=3),
+    }
+    _results = {k: [] for k in _tasks}
+    with ThreadPoolExecutor(max_workers=6) as _ex:
+        _futs = {_ex.submit(fn): name for name, fn in _tasks.items()}
+        for _fut, _name in _futs.items():
+            try:
+                _results[_name] = _fut.result(timeout=12) or []
+            except Exception as e:
+                logger.warning(f"{_name} search failed/timeout: {e}")
+                _results[_name] = []
+    pubmed_refs = _results['pubmed']
+    europe_refs = _results['europe']
+    semantic_refs = _results['semantic']
+    openalex_refs = _results['openalex']
+    crossref_refs = _results['crossref']
+    impc_refs = _results['impc']
     
     # Combine and deduplicate by title
     all_papers = []
