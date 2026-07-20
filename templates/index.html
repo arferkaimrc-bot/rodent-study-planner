@@ -249,6 +249,30 @@
         .sec-list { margin: 0; padding-left: 20px; font-size: 0.88rem; }
         .sec-list li { margin-bottom: 5px; }
         .sec-note { font-size: 0.82rem; color: var(--muted); margin: 0 0 8px 0; }
+        .flow-chart {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: stretch;
+            gap: 6px;
+            margin: 4px 0 6px;
+        }
+        .flow-step {
+            flex: 1 1 120px;
+            min-width: 110px;
+            background: linear-gradient(180deg, rgba(38,166,91,0.12), rgba(38,166,91,0.05));
+            border: 1.5px solid var(--primary-600);
+            border-radius: 10px;
+            padding: 8px 10px;
+            text-align: center;
+        }
+        .flow-day { font-size: 0.72rem; font-weight: 700; color: var(--primary-700); }
+        .flow-phase { font-size: 0.9rem; font-weight: 700; color: var(--text); margin-top: 2px; }
+        .flow-arrow { align-self: center; color: var(--primary-600); font-weight: 800; font-size: 1.1rem; }
+        @media (max-width: 640px) {
+            .flow-step { flex: 1 1 100%; }
+            .flow-arrow { transform: rotate(90deg); align-self: center; }
+        }
+
         .timeline-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
         .timeline-table th {
             text-align: left; background: #f8fafc; color: var(--muted);
@@ -754,17 +778,34 @@
 
         @media (max-width: 768px) {
             .main-container {
-                margin: 16px;
-                padding: 20px;
-            }
-            
-            #groups-area {
-                grid-template-columns: 1fr;
+                margin: 10px;
+                padding: 14px;
             }
 
-            .score-row {
-                grid-template-columns: 1fr;
+            #groups-area { grid-template-columns: 1fr; }
+            .score-row { grid-template-columns: 1fr; }
+
+            /* User bar: let it wrap instead of pushing text off-screen */
+            .user-bar {
+                flex-wrap: wrap !important;
+                justify-content: center !important;
+                gap: 10px !important;
+                font-size: 0.8rem !important;
             }
+
+            /* Grids collapse to fit narrow screens */
+            .grid-form { grid-template-columns: 1fr !important; }
+            .summary-grid { grid-template-columns: 1fr 1fr !important; }
+            .sample-types-grid { grid-template-columns: 1fr !important; }
+            .tox-endpoints-grid { grid-template-columns: 1fr !important; }
+            .main-title { font-size: 1.6rem !important; }
+        }
+
+        /* Prevent any horizontal overflow of the whole page */
+        html, body { max-width: 100%; overflow-x: hidden; }
+        .sample-checkbox span, .sample-checkbox label {
+            white-space: normal;
+            word-break: break-word;
         }
 
     </style>
@@ -773,7 +814,7 @@
     <div class="main-container">
         {% if current_user and current_user.is_authenticated %}
         <!-- User bar -->
-        <div style="display:flex;justify-content:flex-end;align-items:center;gap:14px;padding:6px 0;font-size:0.85rem;color:var(--muted);">
+        <div class="user-bar" style="display:flex;justify-content:flex-end;align-items:center;gap:14px;padding:6px 0;font-size:0.85rem;color:var(--muted);flex-wrap:wrap;">
             <span>👤 {{ current_user.name or current_user.email }}</span>
             {% if current_user.is_admin %}
             <a href="/admin" style="color:#15803d;font-weight:600;text-decoration:none;">👥 Users</a>
@@ -1508,7 +1549,7 @@
                                 <div class="summary-tile highlight">
                                     <div class="stile-label">🔢 Recommended animals per group</div>
                                     <div class="stile-value">${s.recommended_animals || result.recommended_mice || 'N/A'}</div>
-                                    <div class="stile-sub">you planned: ${s.planned_animals || 'N/A'}${result.ml_prediction ? ` · ML estimate: ${result.ml_prediction}` : ''}</div>
+                                    <div class="stile-sub">you planned: ${s.planned_animals || 'N/A'}</div>
                                 </div>
                                 <div class="summary-tile">
                                     <div class="stile-label">${speciesIcon} Species</div>
@@ -1542,7 +1583,10 @@
                                 </div>
                                 <div class="summary-tile wide">
                                     <div class="stile-label">🧫 Samples to collect${s.target_organ && s.target_organ !== 'General' ? ' (focus: ' + s.target_organ + ')' : ''}</div>
-                                    <div class="stile-value" style="font-size:0.95rem;font-weight:600;">${samples}</div>
+                                    <div class="stile-value" style="font-size:0.95rem;font-weight:600;color:var(--primary-700);">
+                                        ✅ Recommended: ${(s.recommended_samples && s.recommended_samples.length) ? s.recommended_samples.join(', ') : 'Blood + target-organ tissue'}
+                                    </div>
+                                    <div class="stile-sub">you selected: ${samples}</div>
                                     ${s.blood_volume_ml ? `<div class="stile-sub">blood needed: ${s.blood_volume_ml} mL ${s.blood_safe === false ? '⚠️ over safe limit' : '✓ within safe limit'}</div>` : ''}
                                     ${(s.toxicity_endpoints && s.toxicity_endpoints.length) ? `<div class="stile-sub">endpoints: ${s.toxicity_endpoints.join(', ')}</div>` : ''}
                                 </div>
@@ -1564,8 +1608,16 @@
                                     <td contenteditable="true" class="tl-activity">${t.activity}</td>
                                     <td class="tl-del" onclick="this.closest('tr').remove()">✕</td>
                                 </tr>`).join('');
+                            const flowSteps = s.timeline.map((t, i) => `
+                                <div class="flow-step">
+                                    <div class="flow-day">${t.day}</div>
+                                    <div class="flow-phase">${t.phase}</div>
+                                </div>
+                                ${i < s.timeline.length - 1 ? '<div class="flow-arrow">→</div>' : ''}`).join('');
                             resultHtml += sectionHtml('🗓️ Experimental Timeline / Study Plan', `
-                                <p class="sec-note">Editable plan — click any cell to change it. From Day 1: acclimatize → ${(result.summary.timeline||[]).some(t=>t.phase==='Fasting')?'fast → ':''}dose → monitor → sample → endpoint.</p>
+                                <p class="sec-note">Study flow — from Day 1: acclimatize → ${(result.summary.timeline||[]).some(t=>t.phase==='Fasting')?'fast → ':''}dose → monitor → sample → endpoint.</p>
+                                <div class="flow-chart">${flowSteps}</div>
+                                <p class="sec-note" style="margin-top:14px;">📋 Editable plan — click any cell to change it:</p>
                                 <div style="overflow-x:auto;">
                                     <table class="timeline-table" data-group="${(result.group_name||'').replace(/"/g,'')}">
                                         <thead><tr><th>Day</th><th>Phase</th><th>Activity</th><th></th></tr></thead>

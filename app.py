@@ -3133,10 +3133,37 @@ def get_prediction_and_suggestion(group, all_groups_count=1):
                     target_organ=group.get('target_organ'))
             except Exception as e:
                 logger.warning(f"Welfare recommendation failed for {drug}: {e}")
+        # Recommended tissues/samples to collect, based on the chosen toxicity
+        # endpoints and the target organ.
+        _endpoints = group.get('toxicity_endpoints', []) or []
+        _organ = (group.get('target_organ') or '').lower()
+        rec_samples = []
+        _ep_map = {
+            'hepatotoxicity': ['Liver tissue', 'Blood (serum)'],
+            'nephrotoxicity': ['Kidney tissue', 'Blood (serum)'],
+            'cardiotoxicity': ['Heart tissue', 'Blood (plasma)'],
+            'neurological':   ['Brain tissue'],
+            'histopathology': ['Target-organ tissue'],
+        }
+        for ep in _endpoints:
+            for kw, samps in _ep_map.items():
+                if kw in ep.lower():
+                    rec_samples += samps
+        organ_tissue = {'liver': 'Liver tissue', 'kidney': 'Kidney tissue',
+                        'heart': 'Heart tissue', 'brain': 'Brain tissue',
+                        'lung': 'Lung tissue', 'spleen': 'Spleen tissue'}.get(_organ)
+        if organ_tissue:
+            rec_samples.append(organ_tissue)
+        if not rec_samples:
+            rec_samples = ['Blood (plasma)', 'Target-organ tissue']
+        # de-duplicate, preserve order
+        recommended_samples = list(dict.fromkeys(rec_samples))
+
         return {
             'species': species,
             'strain': group.get('strain', ''),
             'animal_word': animal_word,
+            'recommended_samples': recommended_samples,
             'recommended_animals': recommended_range,
             'planned_animals': group.get('num_mice', ''),
             'planned_weight_g': group.get('weight'),
