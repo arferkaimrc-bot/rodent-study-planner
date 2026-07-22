@@ -243,6 +243,10 @@ def admin():
                 <button class="btn-sm" type="submit">{toggle_label}</button></form>
               <form method="post" action="{url_for('auth.admin_reset', user_id=u.id)}" style="display:inline">
                 <button class="btn-sm danger" type="submit">Reset pw</button></form>
+              {"" if u.id == current_user.id else f'''
+              <form method="post" action="{url_for('auth.admin_delete', user_id=u.id)}" style="display:inline"
+                    onsubmit="return confirm('Permanently delete {u.email}? This cannot be undone.');">
+                <button class="btn-sm danger" type="submit" style="background:#dc2626;color:#fff;">Delete</button></form>'''}
             </td>
           </tr>"""
     body = f"""
@@ -322,6 +326,25 @@ def admin_reset(user_id):
     db.session.commit()
     flash(f'Password for {u.email} reset. New password: {pw} '
           f'(the user can sign in with it directly).', 'ok')
+    return redirect(url_for('auth.admin'))
+
+
+@auth_bp.route('/admin/delete/<int:user_id>', methods=['POST'])
+@login_required
+def admin_delete(user_id):
+    _admin_only()
+    u = db.session.get(User, user_id)
+    if not u:
+        abort(404)
+    if u.id == current_user.id:
+        flash('You cannot delete your own account.', 'error')
+        return redirect(url_for('auth.admin'))
+    email = u.email
+    # Remove the user's saved draft first (foreign-key dependency), then the user.
+    StudyDraft.query.filter_by(user_id=u.id).delete()
+    db.session.delete(u)
+    db.session.commit()
+    flash(f'Account {email} was permanently deleted.', 'ok')
     return redirect(url_for('auth.admin'))
 
 
