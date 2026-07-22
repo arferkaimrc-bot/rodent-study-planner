@@ -501,10 +501,9 @@
 
         #results-container {
             margin-top: 32px;
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
-            gap: 20px;
+            display: block;   /* one unified result, groups stacked vertically */
         }
+        #results-container > .result-card { margin-bottom: 20px; }
 
         .result-card {
             background: #ffffff;
@@ -1145,7 +1144,7 @@
 
                         <div class="form-group">
                             <label>Start Date:</label>
-                            <input type="date" class="start-date" value="${data?.start_date || ''}">
+                            <input type="date" class="start-date" value="${data?.start_date || ''}" onchange="onStartDateChange(this)">
                         </div>
 
                         <div class="form-group" style="grid-column: 1 / -1;">
@@ -1207,6 +1206,16 @@
             initSpeciesStrain(groupElement);
             initParadigmSuggestions(groupElement);
             createSampleTypesSelector(groupElement, data?.sample_types || []);
+
+            // New groups inherit the first group's Start Date as default (if empty)
+            const allGroups = document.querySelectorAll('.group-container');
+            if (allGroups.length > 1) {
+                const firstDate = allGroups[0].querySelector('.start-date');
+                const thisDate = groupElement.querySelector('.start-date');
+                if (firstDate && thisDate && firstDate.value && !thisDate.value) {
+                    thisDate.value = firstDate.value;
+                }
+            }
         }
 
         window.deleteGroup = function(groupId) {
@@ -1336,6 +1345,20 @@
                 grid.appendChild(label);
             }
             input.value = '';
+        };
+
+        // When the FIRST group's start date is set, use it as the default for
+        // any other group whose start date is still empty.
+        window.onStartDateChange = function(input) {
+            const groups = Array.from(document.querySelectorAll('.group-container'));
+            const firstDate = groups[0] ? groups[0].querySelector('.start-date') : null;
+            if (!firstDate || input !== firstDate) return;   // only propagate from the first group
+            const val = firstDate.value;
+            if (!val) return;
+            groups.slice(1).forEach(g => {
+                const d = g.querySelector('.start-date');
+                if (d && !d.value) d.value = val;
+            });
         };
 
         window.addTimelineRow = function(btn) {
@@ -1516,6 +1539,24 @@
                 showProgress(100, 'Complete!');
                 setTimeout(hideProgress, 500);
 
+                // One unified study result: a single header, then each group below it.
+                const studyTitleTxt = document.getElementById('study-title').value || 'Study Analysis';
+                resultsContainer.innerHTML = `
+                    <div style="background:linear-gradient(135deg,#16a34a,#15803d);color:#fff;border-radius:14px;padding:18px 22px;margin-bottom:20px;">
+                        <div style="font-size:1.3rem;font-weight:800;">📋 ${studyTitleTxt}</div>
+                        <div style="opacity:0.9;font-size:0.9rem;margin-top:2px;">${results.length} group(s) analyzed · details for each below</div>
+                    </div>`;
+
+                // Control groups should use the same recommended number as the treatment groups.
+                const _treatmentRec = results.find(r => r.summary && r.summary.recommended_animals && /\d/.test(r.summary.recommended_animals));
+                const _treatmentNum = _treatmentRec ? _treatmentRec.summary.recommended_animals : null;
+                results.forEach(r => {
+                    if (r.summary && r.summary.recommended_animals && !/\d/.test(String(r.summary.recommended_animals)) && _treatmentNum) {
+                        r.summary.recommended_animals = _treatmentNum;
+                        r.summary._matched_control = true;
+                    }
+                });
+
                 // Display results
                 results.forEach(result => {
                     const validationClass =
@@ -1561,12 +1602,13 @@
                                 <div class="summary-tile highlight">
                                     <div class="stile-label">🔢 Recommended animals per group</div>
                                     <div class="stile-value">${s.recommended_animals || result.recommended_mice || 'N/A'}</div>
-                                    <div class="stile-sub">you planned: ${s.planned_animals || 'N/A'}</div>
+                                    <div class="stile-sub">you planned: ${s.planned_animals || 'N/A'}${s._matched_control ? ' · matched to treatment group' : ''}</div>
                                 </div>
                                 <div class="summary-tile">
-                                    <div class="stile-label">${speciesIcon} Species</div>
+                                    <div class="stile-label">${speciesIcon} Species / Strain</div>
                                     <div class="stile-value" style="font-size:1.1rem;">${s.species || 'Mouse'}</div>
-                                    <div class="stile-sub">${s.strain || ''}</div>
+                                    <div class="stile-sub">you chose: ${s.strain || '—'}</div>
+                                    ${s.recommended_strain ? `<div class="stile-sub" style="color:var(--primary-700);">✅ common: ${s.recommended_strain}</div>` : ''}
                                 </div>
                                 <div class="summary-tile">
                                     <div class="stile-label">⚖️ Weight</div>

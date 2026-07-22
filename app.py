@@ -3197,9 +3197,29 @@ def get_prediction_and_suggestion(group, all_groups_count=1):
             except Exception as e:
                 logger.warning(f"Compound overview failed for {drug}: {e}")
 
+        # Recommended strain by experimental paradigm (common choices in the
+        # literature) — a suggestion the researcher can override.
+        _paradigm = (group.get('experiment_type') or '').lower()
+        _strain_rec = {
+            'oncology': 'BALB/c nude or NOD-SCID (immunodeficient, for xenografts)',
+            'immunology': 'C57BL/6 or BALB/c',
+            'neuroscience': 'C57BL/6',
+            'metabolic': 'C57BL/6 (diet-induced) or ob/ob',
+            'cardiovascular': 'C57BL/6',
+            'toxicology': 'C57BL/6 (mouse) or Sprague-Dawley (rat)',
+        }
+        recommended_strain = None
+        for kw, rec in _strain_rec.items():
+            if kw in _paradigm:
+                recommended_strain = rec
+                break
+        if not recommended_strain:
+            recommended_strain = 'Sprague-Dawley / Wistar' if species == 'Rat' else 'C57BL/6 (most common)'
+
         return {
             'species': species,
             'strain': group.get('strain', ''),
+            'recommended_strain': recommended_strain,
             'drug_overview': drug_overview,
             'animal_word': animal_word,
             'recommended_samples': recommended_samples,
