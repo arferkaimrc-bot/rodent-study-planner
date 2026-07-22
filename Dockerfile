@@ -21,4 +21,4 @@ EXPOSE 8080
 
 # 1 worker + threads keeps memory low (rdkit/sklearn are heavy) while still
 # handling the app's I/O-bound external API calls concurrently.
-CMD exec gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --threads 8 --timeout 120
+CMD exec gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --threads 3 --timeout 120 --max-requests 200 --max-requests-jitter 30

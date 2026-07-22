@@ -2827,7 +2827,7 @@ def build_comprehensive_reference_corpus(group):
         'impc':     lambda: search_impc(group, max_results=3),
     }
     _results = {k: [] for k in _tasks}
-    with ThreadPoolExecutor(max_workers=6) as _ex:
+    with ThreadPoolExecutor(max_workers=4) as _ex:
         _futs = {_ex.submit(fn): name for name, fn in _tasks.items()}
         for _fut, _name in _futs.items():
             try:
@@ -4571,24 +4571,31 @@ def predict():
         all_groups_count = len(all_groups)
         
         for group in all_groups:
-            ncbi = get_drug_data_from_ncbi(group.get('drug_name', ''))
-            
-            if not ncbi['success'] and not ncbi.get('is_control'):
+            gname = group.get('group_name', 'Group')
+            try:
+                ncbi = get_drug_data_from_ncbi(group.get('drug_name', ''))
+
+                if not ncbi['success'] and not ncbi.get('is_control'):
+                    results.append({"group_name": gname, "error": ncbi['error']})
+                    continue
+
+                suggestion = get_prediction_and_suggestion(group, all_groups_count)
+
                 results.append({
-                    "group_name": group.get('group_name', 'Group'),
-                    "error": ncbi['error']
+                    "group_name": gname,
+                    "drug": (group.get('drug_name') or '').capitalize(),
+                    "ncbi_link": ncbi.get('ncbi_link', '#'),
+                    **suggestion
                 })
-                continue
-            
-            suggestion = get_prediction_and_suggestion(group, all_groups_count)
-            
-            results.append({
-                "group_name": group.get('group_name', 'Group'),
-                "drug": (group.get('drug_name') or '').capitalize(),
-                "ncbi_link": ncbi.get('ncbi_link', '#'),
-                **suggestion
-            })
-        
+            except Exception as ge:
+                # One group failing must not break the whole analysis.
+                logger.exception(f"Error analyzing group '{gname}'")
+                results.append({
+                    "group_name": gname,
+                    "error": f"Could not analyze this group ({type(ge).__name__}). "
+                             f"Try again, or check the drug name and dose."
+                })
+
         return jsonify(results)
     
     except Exception as e:
