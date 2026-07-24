@@ -203,15 +203,23 @@
             appearance: none;
             border: none;
             cursor: pointer;
-            padding: 10px 8px;
+            padding: 10px 6px;
             border-radius: 10px;
             background: linear-gradient(180deg, #ffffff, #f9fafb);
             border: 1.5px solid var(--border);
             box-shadow: 0 2px 8px rgba(0,0,0,.06);
             color: var(--text);
             font-weight: 600;
-            font-size: 0.9rem;
+            font-size: 0.85rem;
             transition: all .15s ease;
+            /* long labels (e.g. "Cardiovascular") wrap inside the tile instead
+               of spilling outside the frame */
+            text-align: center;
+            white-space: normal;
+            overflow-wrap: break-word;
+            word-break: break-word;
+            line-height: 1.2;
+            min-width: 0;
         }
 
         .tile:hover {
