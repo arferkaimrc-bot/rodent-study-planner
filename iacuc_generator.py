@@ -172,23 +172,46 @@ def _scientific_justification(rows):
             "are predictive, and is the established model for this class of study.")
 
 
+def _drug_overview_text(s):
+    """`drug_overview` is a dict {description, reference_url} (or occasionally a
+    plain string). Return a clean description sentence — never the raw dict."""
+    ov = s.get("drug_overview")
+    if isinstance(ov, dict):
+        return _s(ov.get("description"))
+    return _s(ov)
+
+
+def _drug_overview_url(s):
+    ov = s.get("drug_overview")
+    return _s(ov.get("reference_url")) if isinstance(ov, dict) else ""
+
+
 def _literature_background(rows):
-    papers = []
+    # Real, on-topic references only: the compound summaries and the papers the
+    # platform's literature search returned — never fabricated.
+    overviews, refs = [], []
+    for _, _, s in rows:
+        desc = _drug_overview_text(s)
+        if desc:
+            overviews.append(desc)
+        url = _drug_overview_url(s)
+        if url:
+            refs.append(url)
     for _, a, _ in rows:
         for p in (a.get("reference_papers") or [])[:3]:
             t = _s(p.get("title") if isinstance(p, dict) else p)
             yr = _s(p.get("year")) if isinstance(p, dict) else ""
             if t:
-                papers.append(f"{t}" + (f" ({yr})" if yr else ""))
-    overviews = _join_unique(_s(s.get("drug_overview")) for _, _, s in rows if _s(s.get("drug_overview")))
+                refs.append(f"{t}" + (f" ({yr})" if yr else ""))
     out = []
     if overviews:
-        out.append(overviews[0])
+        out.append(_join_unique(overviews)[0])
     out.append("The proposed work builds on existing pharmacological and toxicological "
                "literature for the test article(s) and study paradigm.")
-    if papers:
-        out.append("Representative references identified during study design include:")
-        out.append(_bullets(_join_unique(papers)[:6]))
+    refs = _join_unique(refs)
+    if refs:
+        out.append("References identified during study design:")
+        out.append(_bullets(refs[:6]))
     return "\n".join(out)
 
 
@@ -628,6 +651,11 @@ def fill_form_controls(doc, rows, admin):
     box(41, "Brief manual restraint (scruff / one-handed hold) for < 2 minutes "
             "during gavage, injection and sample collection; no mechanical restraint "
             "device is used.")
+    cb(34, 0)                                    # acclimatization period? YES
+
+    # ── PART 7 — hazardous agents (A/B/C): none ───────────────────────────
+    box(50, "Not applicable — no Category A/B/C agents (radioactive, "
+            "carcinogenic/cytotoxic, or infectious) are administered in this protocol.")
 
     # ── PART 8 — disposition & euthanasia ─────────────────────────────────
     cb(62, 0)                                    # animals will be euthanised
@@ -658,9 +686,13 @@ def fill_form_controls(doc, rows, admin):
                 "condition score ≤ 2/5, severe or unresolving clinical signs, or "
                 "inability to reach food / water.")
 
+    # ── PART 10 — antibody production: none ───────────────────────────────
+    box(72, "Not applicable — this protocol does not involve antibody production.")
+
     # ── PART 12 — surgery: none in this protocol ──────────────────────────
     cb(88, 2)                                    # neuromuscular blockers? NO
     cb(90, 2)                                    # non-survival practice animals? NO
+    box(105, "Not applicable — no surgical procedures are performed in this protocol.")
 
 
 def generate_iacuc_docx(payload):

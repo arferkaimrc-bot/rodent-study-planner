@@ -307,22 +307,22 @@ class BloodQuantityCalculator:
                 'safety_assessment': 'No blood collection needed'
             }
         
-        # Determine which assays to perform based on sample types
+        # One representative assay per blood sample type (a researcher who ticks
+        # "serum" usually runs a single chemistry panel — not three assays). This
+        # avoids over-estimating the volume and raising a false warning.
+        rep_assay = {
+            'whole blood': 'Complete Blood Count (CBC)',
+            'plasma': 'Pharmacokinetics',
+            'serum': 'Blood Chemistry Panel',
+        }
         assays_needed = []
-        
         for sample in blood_samples:
             sample_lower = sample.lower()
-            
-            # Map sample types to common assays
-            if 'whole blood' in sample_lower:
-                assays_needed.extend(['Complete Blood Count (CBC)', 'Flow Cytometry', 'Glucose'])
-            if 'plasma' in sample_lower:
-                assays_needed.extend(['Cytokine Analysis (ELISA)', 'Pharmacokinetics', 'Metabolomics'])
-            if 'serum' in sample_lower:
-                assays_needed.extend(['Blood Chemistry Panel', 'Lipid Profile', 'Antibody Titers'])
-        
-        # Remove duplicates
-        assays_needed = list(set(assays_needed))
+            for kw, assay in rep_assay.items():
+                if kw in sample_lower and assay not in assays_needed:
+                    assays_needed.append(assay)
+        if not assays_needed:                       # generic "blood" with no subtype
+            assays_needed = ['Blood Chemistry Panel']
         
         # Calculate total volume needed
         for assay in assays_needed:
@@ -347,16 +347,23 @@ class BloodQuantityCalculator:
         # Calculate safe collection volume
         safe_volume = BloodQuantityCalculator.calculate_safe_collection(weight_g, timepoints)
         total_blood_volume = BloodQuantityCalculator.calculate_total_blood_volume(weight_g)
-        
-        # Safety assessment
+        # At the study endpoint blood is collected terminally (under anaesthesia,
+        # e.g. cardiac puncture), where ~40% of total blood volume is routinely
+        # obtainable — far more than the 10% survival-bleed limit. Judge against
+        # both so a normal terminal sample isn't flagged as unsafe.
+        terminal_safe = total_blood_volume * 1000 * 0.40   # µL
+
         if total_needed_with_overage <= safe_volume:
-            safety = "✓ SAFE - Within recommended limits"
+            safety = "✓ SAFE - Within the survival (non-terminal) single-collection limit"
             safety_color = "green"
-        elif total_needed_with_overage <= safe_volume * 1.3:
-            safety = "⚠ CAUTION - Approaching limits, monitor animals closely"
+        elif total_needed_with_overage <= terminal_safe:
+            safety = "✓ SAFE at terminal collection - Obtainable under terminal anaesthesia (e.g. cardiac puncture) at the study endpoint"
+            safety_color = "green"
+        elif total_needed_with_overage <= terminal_safe * 1.15:
+            safety = "⚠ CAUTION - Near the maximum obtainable volume; collect terminally, reduce assays, or pool across animals"
             safety_color = "orange"
         else:
-            safety = "✗ UNSAFE - Exceeds safe collection limits. Reduce assays or increase timepoint intervals"
+            safety = "✗ UNSAFE - Exceeds the volume obtainable from one animal. Reduce assays, pool samples, or add animals/timepoints"
             safety_color = "red"
         
         return {
@@ -4050,7 +4057,6 @@ def generate_enhanced_pdf(study_data):
         ['Principal Investigator:', study_data.get('pi_name', 'Not specified')],
         ['Institution:', study_data.get('institution', 'Not specified')],
         ['Study Type:', 'Rodent Pharmacology Study'],
-        ['Total Duration:', f'{total_weeks} weeks'],
         ['Start Date:', display_start_date if display_start_date else 'TBD']
     ]
     
@@ -4079,12 +4085,11 @@ def generate_enhanced_pdf(study_data):
     story.extend(build_flowchart_flowables(derive_flow_phases(study_data), heading_style))
 
     # Editable day-by-day protocol timeline(s)
+    # ONE unified timeline for the whole study (all groups merged).
     timelines = study_data.get('timelines', []) or []
-    for tl in timelines:
-        steps = tl.get('steps', []) or []
-        if not steps:
-            continue
-        tl_header = [[Paragraph(f"🗓️ Experimental Timeline — {tl.get('group', '')}", heading_style)]]
+    merged_steps = merge_timelines(timelines)
+    if merged_steps:
+        tl_header = [[Paragraph("🗓️ Experimental Timeline / Study Plan (all groups)", heading_style)]]
         tl_header_table = Table(tl_header, colWidths=[7*inch])
         tl_header_table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, -1), HexColor('#dbeafe')),
@@ -4099,11 +4104,13 @@ def generate_enhanced_pdf(study_data):
         cell_style = ParagraphStyle('tlcell', fontName='Helvetica', fontSize=8, leading=10)
         head_style = ParagraphStyle('tlhead', fontName='Helvetica-Bold', fontSize=8, leading=10, textColor=colors.white)
         tl_data = [[Paragraph('Day', head_style), Paragraph('Phase', head_style), Paragraph('Activity', head_style)]]
-        for step in steps:
+        for step in merged_steps:
+            # per-group lines are newline-separated -> <br/> for reportlab
+            activity = str(escape(step.get('activity', ''))).replace('\n', '<br/>')
             tl_data.append([
-                Paragraph(str(step.get('day', '')), cell_style),
-                Paragraph(str(step.get('phase', '')), cell_style),
-                Paragraph(str(step.get('activity', '')), cell_style),
+                Paragraph(str(escape(step.get('day', ''))), cell_style),
+                Paragraph(str(escape(step.get('phase', ''))), cell_style),
+                Paragraph(activity, cell_style),
             ])
         tl_table = Table(tl_data, colWidths=[0.9*inch, 1.3*inch, 4.8*inch])
         tl_table.setStyle(TableStyle([
@@ -4255,34 +4262,62 @@ def add_visual_timeline_to_docx(doc, phases):
     
     doc.add_paragraph()
 
+def merge_timelines(timelines):
+    """Merge per-group timelines into ONE unified timeline.
+
+    Rows are keyed by (day, phase) in first-seen order. When the activity is the
+    same for every group it is shown once; when it differs (e.g. the dosing step)
+    each group's instruction is listed within that row so a single timeline
+    carries the whole study."""
+    order, acts = [], {}
+    for tl in (timelines or []):
+        grp = (tl.get('group') or '').strip()
+        for step in (tl.get('steps') or []):
+            key = (str(step.get('day', '')).strip(), str(step.get('phase', '')).strip())
+            act = str(step.get('activity', '')).strip()
+            if key not in acts:
+                acts[key] = []
+                order.append(key)
+            acts[key].append((grp, act))
+    merged = []
+    for key in order:
+        pairs = acts[key]
+        distinct = list(dict.fromkeys(a for _, a in pairs))
+        if len(distinct) <= 1:
+            activity = distinct[0] if distinct else ''
+        else:
+            lines = [f"{g}: {a}" if g else a for g, a in pairs]
+            activity = "\n".join(dict.fromkeys(lines))   # de-dup identical lines
+        merged.append({'day': key[0], 'phase': key[1], 'activity': activity})
+    return merged
+
+
 def add_protocol_timelines_to_docx(doc, timelines):
-    """Render the editable day-by-day protocol timeline(s) into the Word doc."""
-    if not timelines:
+    """Render ONE unified day-by-day protocol timeline (all groups) into Word."""
+    steps = merge_timelines(timelines)
+    if not steps:
         return
     doc.add_heading("Experimental Timeline / Study Plan", level=1)
-    for tl in timelines:
-        steps = tl.get('steps', []) or []
-        if not steps:
-            continue
-        gname = tl.get('group', '')
-        if gname:
-            p = doc.add_paragraph()
-            r = p.add_run(gname)
-            r.font.bold = True
-            r.font.size = Pt(12)
-        table = doc.add_table(rows=1, cols=3)
-        table.style = 'Light Grid Accent 1'
-        hdr = table.rows[0].cells
-        hdr[0].text, hdr[1].text, hdr[2].text = 'Day', 'Phase', 'Activity'
-        for c in hdr:
-            if c.paragraphs[0].runs:
-                c.paragraphs[0].runs[0].font.bold = True
-        for step in steps:
-            row = table.add_row().cells
-            row[0].text = str(step.get('day', ''))
-            row[1].text = str(step.get('phase', ''))
-            row[2].text = str(step.get('activity', ''))
-        doc.add_paragraph()
+    table = doc.add_table(rows=1, cols=3)
+    table.style = 'Light Grid Accent 1'
+    hdr = table.rows[0].cells
+    hdr[0].text, hdr[1].text, hdr[2].text = 'Day', 'Phase', 'Activity'
+    for c in hdr:
+        if c.paragraphs[0].runs:
+            c.paragraphs[0].runs[0].font.bold = True
+    for step in steps:
+        row = table.add_row().cells
+        row[0].text = str(step.get('day', ''))
+        row[1].text = str(step.get('phase', ''))
+        # activity may hold per-group lines separated by \n -> real line breaks
+        lines = str(step.get('activity', '')).split('\n')
+        para = row[2].paragraphs[0]
+        para.add_run(lines[0])
+        for extra in lines[1:]:
+            run = para.add_run()
+            run.add_break()
+            para.add_run(extra)
+    doc.add_paragraph()
 
 
 def add_study_phases_to_docx(doc, phases):
@@ -4464,14 +4499,13 @@ def generate_enhanced_docx(study_data):
     # Study Information Section (with green background)
     doc.add_heading("Study Information", level=1)
     
-    info_table = doc.add_table(rows=5, cols=2)
+    info_table = doc.add_table(rows=4, cols=2)
     info_table.style = 'Light Grid'
-    
+
     info_data = [
         ['Principal Investigator:', study_data.get('pi_name', 'Not specified')],
         ['Institution:', study_data.get('institution', 'Not specified')],
         ['Study Type:', 'Rodent Pharmacology Study'],
-        ['Total Duration:', f'{total_weeks} weeks'],
         ['Start Date:', phases[0]['start_date'] if phases else 'TBD']
     ]
     
