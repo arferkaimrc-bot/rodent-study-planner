@@ -38,7 +38,7 @@ from reportlab.pdfgen import canvas
 from reportlab.lib import colors
 from reportlab.lib.units import inch
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak, Image
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak, Image, KeepTogether
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_JUSTIFY
 from reportlab.graphics.shapes import Drawing, Rect, String, Line
 from reportlab.graphics.charts.barcharts import VerticalBarChart
@@ -3801,8 +3801,138 @@ def create_sample_collection_diagram(blood_calc, width=400, height=200):
     needed_label = String(230, 15, f"Needed: {blood_calc['total_volume_ml']} mL", textAnchor='middle')
     needed_label.fontSize = 8
     drawing.add(needed_label)
-    
+
     return drawing
+
+
+# ── Study flow chart (shared by the PDF and Word study-plan exports) ─────────
+# One unified flow chart for the whole study, regardless of how many groups.
+FLOW_PALETTE_HEX = ['#4CAF50', '#2196F3', '#FF9800', '#9C27B0', '#009688', '#E91E63', '#3F51B5']
+FLOW_PALETTE_RGB = [(76, 175, 80), (33, 150, 243), (255, 152, 0), (156, 39, 176),
+                    (0, 150, 136), (233, 30, 99), (63, 81, 181)]
+
+
+def derive_flow_phases(study_data):
+    """Ordered, de-duplicated phase names for the study flow chart.
+
+    Prefers the phase labels from the (possibly edited) day-by-day timelines —
+    unioned across every group so one flow chart covers the whole study — and
+    falls back to a standard protocol sequence inferred from the group data.
+    """
+    seen = []
+    for tl in (study_data.get('timelines') or []):
+        for step in (tl.get('steps') or []):
+            p = (step.get('phase') or '').strip()
+            if p and p not in seen:
+                seen.append(p)
+    if seen:
+        return seen[:7]
+    # Fallback: infer a standard protocol sequence from the groups themselves
+    groups = study_data.get('groups') or []
+    has_drug = any((g.get('drug_name') or g.get('drug')) for g in groups)
+    has_samples = any((g.get('sample_types') or g.get('toxicity_endpoints')) for g in groups)
+    flow = ['Acclimatization', 'Baseline', 'Dosing' if has_drug else 'Intervention', 'Monitoring']
+    if has_samples:
+        flow.append('Sample collection')
+    flow.append('Endpoint')
+    return flow[:7]
+
+
+def build_flowchart_flowables(phase_names, heading_style):
+    """Return reportlab flowables: a header box + a horizontal phase flow chart
+    (coloured boxes joined by arrows) that always fits the usable page width."""
+    if not phase_names:
+        return []
+    n = len(phase_names)
+    arrow_w = 0.28
+    box_w = max(0.7, (7.0 - arrow_w * (n - 1)) / n)   # fit within 7" usable width
+    box_style = ParagraphStyle('fcbox', fontName='Helvetica-Bold', fontSize=8,
+                               leading=10, textColor=colors.white, alignment=TA_CENTER)
+    arrow_style = ParagraphStyle('fcarrow', fontName='Helvetica-Bold', fontSize=13,
+                                 textColor=HexColor('#26a65b'), alignment=TA_CENTER)
+    row, widths, bg = [], [], []
+    col = 0
+    for i, name in enumerate(phase_names):
+        row.append(Paragraph(name, box_style))
+        widths.append(box_w * inch)
+        bg.append(('BACKGROUND', (col, 0), (col, 0),
+                   HexColor(FLOW_PALETTE_HEX[i % len(FLOW_PALETTE_HEX)])))
+        col += 1
+        if i < n - 1:
+            row.append(Paragraph('→', arrow_style))
+            widths.append(arrow_w * inch)
+            col += 1
+    chart = Table([row], colWidths=widths)
+    chart.setStyle(TableStyle(bg + [
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('TOPPADDING', (0, 0), (-1, -1), 7),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 7),
+        ('LEFTPADDING', (0, 0), (-1, -1), 3),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 3),
+    ]))
+    header = Table([[Paragraph("🔀 Study Flow Chart", heading_style)]], colWidths=[7 * inch])
+    header.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), HexColor('#ede9fe')),
+        ('BOX', (0, 0), (-1, -1), 1, HexColor('#8b5cf6')),
+        ('LEFTPADDING', (0, 0), (-1, -1), 8),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+    ]))
+    return [header, Spacer(1, 0.05 * inch), KeepTogether(chart), Spacer(1, 0.12 * inch)]
+
+
+def add_flowchart_docx(doc, phase_names):
+    """Add the unified study flow chart (coloured phase boxes + arrows) to Word."""
+    if not phase_names:
+        return
+    doc.add_heading("Study Flow Chart", level=1)
+    ncols = 2 * len(phase_names) - 1
+    table = doc.add_table(rows=1, cols=ncols)
+    table.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    table.autofit = False
+    table.allow_autofit = False
+    # Force a fixed column layout so boxes stay wide and arrows stay narrow.
+    _tblPr = table._tbl.tblPr
+    _layout = OxmlElement('w:tblLayout')
+    _layout.set(qn('w:type'), 'fixed')
+    _tblPr.append(_layout)
+    # Fit within the ~6.5" usable portrait width.
+    n = len(phase_names)
+    box_w = Inches(min(1.1, (6.4 - 0.2 * (n - 1)) / n))
+    ci = 0
+    for i, name in enumerate(phase_names):
+        cell = table.rows[0].cells[ci]
+        cell.text = name
+        try:
+            cell.width = box_w
+        except Exception:
+            pass
+        para = cell.paragraphs[0]
+        para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        for run in para.runs:
+            run.font.bold = True
+            run.font.color.rgb = RGBColor(255, 255, 255)
+            run.font.size = Pt(9)
+        shd = OxmlElement('w:shd')
+        shd.set(qn('w:fill'), '%02x%02x%02x' % FLOW_PALETTE_RGB[i % len(FLOW_PALETTE_RGB)])
+        cell._element.get_or_add_tcPr().append(shd)
+        ci += 1
+        if i < len(phase_names) - 1:
+            acell = table.rows[0].cells[ci]
+            acell.text = '→'
+            try:
+                acell.width = Inches(0.2)
+            except Exception:
+                pass
+            ap = acell.paragraphs[0]
+            ap.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            for run in ap.runs:
+                run.font.bold = True
+                run.font.size = Pt(12)
+                run.font.color.rgb = RGBColor(38, 166, 91)
+            ci += 1
+    doc.add_paragraph()
+
 
 def generate_enhanced_pdf(study_data):
     """Generate enhanced PDF with backgrounds and optimized to fit on one page."""
@@ -3944,6 +4074,9 @@ def generate_enhanced_pdf(study_data):
     
     story.append(info_table)
     story.append(Spacer(1, 0.1*inch))
+
+    # Unified study flow chart (all groups, one chart)
+    story.extend(build_flowchart_flowables(derive_flow_phases(study_data), heading_style))
 
     # Editable day-by-day protocol timeline(s)
     timelines = study_data.get('timelines', []) or []
@@ -4354,6 +4487,10 @@ def generate_enhanced_docx(study_data):
             shading_elm = OxmlElement('w:shd')
             shading_elm.set(qn('w:fill'), 'd4edda')  # Light green
             cell._element.get_or_add_tcPr().append(shading_elm)
+
+    # Unified study flow chart (all groups, one chart)
+    doc.add_paragraph()
+    add_flowchart_docx(doc, derive_flow_phases(study_data))
 
     # Editable day-by-day protocol timeline (from the results / user edits)
     doc.add_paragraph()
