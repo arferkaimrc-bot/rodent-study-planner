@@ -3072,6 +3072,20 @@ def build_protocol_timeline(group, animal_word='mice'):
     is_control = (group.get('drug_name', '') or '').lower() in ['saline', 'control', 'pbs', 'vehicle']
     agent = 'vehicle (saline)' if is_control else f"{group.get('drug_name', 'compound')} at {dose} mg/kg"
 
+    # Group-specific objective — so Sample collection & Endpoint rows read
+    # per group (each group's aims differ within the study).
+    _organ = (group.get('target_organ') or '').strip()
+    _endpoints = group.get('toxicity_endpoints', []) or []
+    _obj_bits = []
+    if _endpoints:
+        _obj_bits.append(', '.join(_endpoints))
+    if _organ and _organ.lower() not in ('', 'general', 'none'):
+        _obj_bits.append(f'target organ: {_organ}')
+    if is_control:
+        objective = 'baseline / control comparison'
+    else:
+        objective = '; '.join(_obj_bits) if _obj_bits else 'general toxicity assessment'
+
     steps = [
         {'day': 'Day 1–3', 'phase': 'Acclimatization',
          'activity': f'Allow {animal_word} to acclimatize to the facility. Free access to food and water; daily health checks.'},
@@ -3087,9 +3101,9 @@ def build_protocol_timeline(group, animal_word='mice'):
         {'day': 'Day 6–11', 'phase': 'Monitoring',
          'activity': 'Daily monitoring: body weight, clinical signs and humane endpoints (see Toxicity & Humane Endpoints).'},
         {'day': 'Day 12', 'phase': 'Sample collection',
-         'activity': f'Collect samples: {sample_str}. Respect safe blood-volume limits.'},
+         'activity': f'Collect samples: {sample_str} — for {objective}. Respect safe blood-volume limits.'},
         {'day': 'Day 13', 'phase': 'Endpoint',
-         'activity': 'Apply humane endpoint / approved euthanasia method; collect terminal tissues.'},
+         'activity': f'Apply humane endpoint / approved euthanasia; collect terminal tissues for {objective}.'},
     ]
     return steps
 
