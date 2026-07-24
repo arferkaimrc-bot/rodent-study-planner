@@ -253,9 +253,9 @@ def _procedures_overview(rows):
         lines.append("Representative timeline:")
         for step in tl[:8]:
             if isinstance(step, dict):
-                day = _s(step.get("day"))
+                day = _s(step.get("day"))   # already contains "Day …"
                 act = _s(step.get("activity") or step.get("phase"))
-                lines.append(f"  Day {day}: {act}" if day else f"  {act}")
+                lines.append(f"  {day}: {act}" if day else f"  {act}")
     return "\n".join(lines)
 
 
@@ -473,6 +473,59 @@ def _set_para_el(p, text):
         p.append(r)
 
 
+def _left_align(p):
+    """Force left alignment on a paragraph (answer boxes default to 'justify',
+    which stretches multi-line answers across the whole line)."""
+    pPr = p.find(qn('w:pPr'))
+    if pPr is None:
+        pPr = p.makeelement(qn('w:pPr'), {})
+        p.insert(0, pPr)
+    jc = pPr.find(qn('w:jc'))
+    if jc is None:
+        jc = pPr.makeelement(qn('w:jc'), {})
+        pPr.append(jc)
+    jc.set(qn('w:val'), 'left')
+
+
+def _ordered_unwrapped_tcs(tr):
+    """Return a row's cells (<w:tc>) in visual order, unwrapping any that are
+    wrapped in a cell-level content control (tr > sdt > … > tc).
+
+    python-docx's `row.cells` misaligns columns when a cell is sdt-wrapped, so
+    for the structured tables we walk the row XML directly and unwrap first."""
+    tcs = []
+    for ch in list(tr):
+        if ch.tag == qn('w:tc'):
+            tcs.append(ch)
+        elif ch.tag == qn('w:sdt'):
+            inner = ch.find('.//' + qn('w:tc'))
+            if inner is not None:
+                tr.replace(ch, inner)      # drop the content control + placeholder
+                tcs.append(inner)
+    return tcs
+
+
+def _set_tc_clean(tc, text):
+    """Clear a cell element and write clean left-aligned text into it."""
+    for child in list(tc):
+        if child.tag == qn('w:tcPr'):
+            continue
+        tc.remove(child)
+    p = tc.makeelement(qn('w:p'), {})
+    tc.append(p)
+    _set_para_el(p, text)
+    _left_align(p)
+
+
+def _fill_struct_row(row, values):
+    """Fill a structured-table row (personnel / animals) column by column,
+    handling sdt-wrapped cells so columns line up."""
+    tcs = _ordered_unwrapped_tcs(row._tr)
+    for ci, v in enumerate(values):
+        if ci < len(tcs):
+            _set_tc_clean(tcs[ci], v)
+
+
 def _write_cell(cell, text):
     """Write text into a cell — into its plain-text content control if it has
     one, otherwise into the cell's first paragraph."""
@@ -485,8 +538,11 @@ def _write_cell(cell, text):
                     p = content.find('.//' + qn('w:p'))
                 if p is not None:
                     _set_para_el(p, text)
+                    _left_align(p)
                     return
-    _set_para_el(cell.paragraphs[0]._p, text)
+    p = cell.paragraphs[0]._p
+    _set_para_el(p, text)
+    _left_align(p)
 
 
 def _write_box(table, text):
@@ -500,10 +556,12 @@ def _write_box(table, text):
                 p = content.find('.//' + qn('w:p'))
                 if p is not None:
                     _set_para_el(p, text)
+                    _left_align(p)
                     return
     p = tc.find('.//' + qn('w:p'))
     if p is not None:
         _set_para_el(p, text)
+        _left_align(p)
 
 
 def _write_explain(table, text):
@@ -549,7 +607,7 @@ def _study_flags(rows):
     return {'pain': pain}
 
 
-def fill_form_controls(doc, rows, admin):
+def fill_form_controls(doc, rows, admin, study):
     """Tick every relevant checkbox and fill the structured tables so the
     researcher only has to review. Standard, conservative answers for a
     non-surgical, non-hazardous rodent pharmacology / toxicology study."""
@@ -557,6 +615,32 @@ def fill_form_controls(doc, rows, admin):
     flags = _study_flags(rows)
     pain = flags['pain']
     absl = _s((admin or {}).get('housing_type')).lower() == 'absl'
+
+    # ── PART 1 — Research team (T2) & PART 3 — animal table (T10) ──────────
+    # These cells carry content controls (dropdowns / placeholders); fill them
+    # with clean text in the correct columns, clearing the placeholders.
+    team = _team(admin, study)
+    for i, m in enumerate(team[:6]):
+        r = 1 + i
+        if r >= len(T[2].rows):
+            break
+        try:
+            _fill_struct_row(T[2].rows[r],
+                             [m['name'], m['role'], m['qualifications'],
+                              m['institution'], m['email'], m['mobile']])
+        except Exception:
+            pass
+    animals = _animals(rows)
+    for i, an in enumerate(animals[:6]):
+        r = 1 + i
+        if r >= len(T[10].rows):
+            break
+        try:
+            _fill_struct_row(T[10].rows[r],
+                             [an['species'], an['strain'], an['sex'],
+                              an['age'], an['total'], an['source']])
+        except Exception:
+            pass
 
     def cb(idx, cell, k=0, checked=True):
         try:
@@ -715,7 +799,7 @@ def generate_iacuc_docx(payload):
     tmp.seek(0)
 
     doc = Document(tmp)
-    fill_form_controls(doc, rows, payload.get("admin") or {})
+    fill_form_controls(doc, rows, payload.get("admin") or {}, payload.get("study") or {})
 
     buf = io.BytesIO()
     doc.save(buf)

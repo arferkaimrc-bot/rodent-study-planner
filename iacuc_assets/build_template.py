@@ -82,6 +82,20 @@ def _set_para_text(p, text):
         p.append(r)
 
 
+def _left_align(p):
+    """Force left alignment on a <w:p> so multi-line answers don't get the
+    box's default 'justify' (which stretches words across the line)."""
+    pPr = p.find(qn("w:pPr"))
+    if pPr is None:
+        pPr = p.makeelement(qn("w:pPr"), {})
+        p.insert(0, pPr)
+    jc = pPr.find(qn("w:jc"))
+    if jc is None:
+        jc = pPr.makeelement(qn("w:jc"), {})
+        pPr.append(jc)
+    jc.set(qn("w:val"), "left")
+
+
 def set_box_tag(table, text):
     """Set the text of the first cell of a box table.
 
@@ -95,6 +109,7 @@ def set_box_tag(table, text):
         p = tc.makeelement(qn("w:p"), {})
         tc.append(p)
     _set_para_text(p, text)
+    _left_align(p)
 
 
 def set_cell_tag(cell, text):
@@ -110,15 +125,10 @@ def build(src: Path):
     for idx, tag in BOX_TAGS.items():
         set_box_tag(tables[idx], "{{ %s }}" % tag)
 
-    # 2) repeating tables — fixed indexed slots with conditional output fields
-    for idx, (iterable, first_row, n_rows, fields) in ROW_SLOTS.items():
-        tbl = tables[idx]
-        for i in range(n_rows):
-            row = tbl.rows[first_row + i]
-            for col, field in enumerate(fields):
-                tag = "{{ %s[%d].%s if %s|length > %d else '' }}" % (
-                    iterable, i, field, iterable, i)
-                set_cell_tag(row.cells[col], tag)
+    # 2) The personnel (T2) and animal (T10) tables have per-cell content
+    #    controls (dropdowns / "click here" text). docxtpl tags render *beside*
+    #    those placeholders, which looks column-shifted — so these are filled in
+    #    the runtime post-process pass instead (see iacuc_generator).
 
     # 3) funding source — appended next to the "Other" funding cell (PART 1)
     funding_tbl = tables[5]
@@ -129,7 +139,7 @@ def build(src: Path):
 
     doc.save(str(OUT))
     print(f"✓ template written: {OUT}")
-    print(f"  {len(BOX_TAGS)} text boxes + {len(ROW_SLOTS)} tables + funding tagged")
+    print(f"  {len(BOX_TAGS)} text boxes tagged (personnel/animal filled at runtime)")
 
 
 if __name__ == "__main__":
