@@ -910,6 +910,47 @@
         <div id="results-container"></div>
     </div>
 
+    <!-- ═══ IACUC Auto-Fill modal ═══ -->
+    <div id="iacuc-overlay" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.55);
+        z-index:1000;align-items:flex-start;justify-content:center;overflow-y:auto;padding:30px 14px;">
+      <div style="background:#fff;max-width:620px;width:100%;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.3);overflow:hidden;">
+        <div style="background:linear-gradient(135deg,#8b5cf6,#6d28d9);color:#fff;padding:18px 22px;">
+          <div style="font-size:1.2rem;font-weight:800;">📄 Auto-Fill IACUC Form</div>
+          <div style="opacity:.9;font-size:.85rem;margin-top:2px;">
+            The scientific sections are filled from your analysis. Just add the details below.</div>
+        </div>
+        <div style="padding:20px 22px;max-height:60vh;overflow-y:auto;">
+
+          <label style="font-weight:700;font-size:.9rem;">💰 Funding source</label>
+          <input id="iacuc-funding" type="text" placeholder="e.g., KAIMRC intramural grant #RC-2026"
+            style="width:100%;padding:10px;margin:6px 0 16px;border:1px solid var(--border);border-radius:8px;">
+
+          <label style="font-weight:700;font-size:.9rem;">🏠 Housing type</label>
+          <select id="iacuc-housing"
+            style="width:100%;padding:10px;margin:6px 0 16px;border:1px solid var(--border);border-radius:8px;">
+            <option value="standard">Standard housing</option>
+            <option value="absl">ABSL (biocontainment) housing</option>
+          </select>
+
+          <label style="font-weight:700;font-size:.9rem;">👥 Research team members</label>
+          <div style="font-size:.8rem;color:#64748b;margin:2px 0 8px;">
+            The PI is added automatically from the study details. Add co-investigators / staff.</div>
+          <div id="iacuc-team"></div>
+          <button type="button" onclick="addIacucMember()"
+            style="background:#ede9fe;color:#6d28d9;border:1px dashed #a78bfa;padding:8px 14px;
+            border-radius:8px;cursor:pointer;font-weight:600;font-size:.85rem;">＋ Add team member</button>
+        </div>
+        <div style="display:flex;gap:10px;padding:16px 22px;border-top:1px solid var(--border);">
+          <button type="button" onclick="closeIacucModal()"
+            style="flex:0 0 auto;background:#f1f5f9;color:#334155;border:none;padding:12px 18px;
+            border-radius:10px;cursor:pointer;font-weight:600;">Cancel</button>
+          <button type="button" id="iacuc-generate-btn" onclick="submitIacuc()"
+            style="flex:1;background:linear-gradient(180deg,#8b5cf6,#6d28d9);color:#fff;border:none;
+            padding:12px 18px;border-radius:10px;cursor:pointer;font-weight:700;">Generate Protocol (.docx)</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Footer -->
     <footer style="text-align:center; padding:24px 16px 32px; margin-top:24px; border-top:1px solid var(--border); color:var(--muted); font-size:0.9rem;">
         <div style="font-weight:700; color:var(--primary-700);">🐭 Rodent Study Planner</div>
@@ -1781,6 +1822,28 @@
                     resultsContainer.innerHTML += resultHtml;
                 });
 
+                // Remember this analysis so the IACUC auto-fill can reuse it
+                // (kept only in memory — never persisted).
+                window.__lastAnalysis = results;
+                window.__lastGroups = groupsData;
+                window.__lastStudy = {
+                    study_title: document.getElementById('study-title').value || '',
+                    pi_name: document.getElementById('pi-name').value || '',
+                    institution: document.getElementById('institution').value || ''
+                };
+
+                // "Auto-Fill IACUC Form" call-to-action on the results.
+                const iacucBar = document.createElement('div');
+                iacucBar.style.cssText = 'text-align:center;margin:22px 0 6px 0;';
+                iacucBar.innerHTML =
+                    '<button type="button" onclick="openIacucModal()" ' +
+                    'style="background:linear-gradient(180deg,#8b5cf6,#6d28d9);color:#fff;border:none;' +
+                    'padding:15px 26px;font-size:1.05rem;font-weight:700;border-radius:12px;cursor:pointer;' +
+                    'box-shadow:0 4px 14px rgba(109,40,217,.35);">📄 Auto-Fill IACUC Form</button>' +
+                    '<div style="font-size:0.8rem;color:#64748b;margin-top:6px;">' +
+                    'Generates the KAIMRC Animal Ethics application (.docx) — you add only team &amp; funding.</div>';
+                resultsContainer.appendChild(iacucBar);
+
                 resultsContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
             } catch (error) {
@@ -1800,9 +1863,94 @@
         window.toggleCollapsible = function(header) {
             const content = header.nextElementSibling;
             const arrow = header.querySelector('span:last-child');
-            
+
             content.classList.toggle('open');
             arrow.textContent = content.classList.contains('open') ? '▲' : '▼';
+        };
+
+        // ═══ IACUC Auto-Fill modal ═══
+        window.openIacucModal = function() {
+            if (!window.__lastAnalysis) {
+                alert('Please run "Analyze Study" first.');
+                return;
+            }
+            const team = document.getElementById('iacuc-team');
+            if (!team.children.length) addIacucMember();   // start with one blank row
+            document.getElementById('iacuc-overlay').style.display = 'flex';
+        };
+
+        window.closeIacucModal = function() {
+            document.getElementById('iacuc-overlay').style.display = 'none';
+        };
+
+        window.addIacucMember = function() {
+            const wrap = document.createElement('div');
+            wrap.className = 'iacuc-member';
+            wrap.style.cssText = 'display:grid;grid-template-columns:1fr 1fr auto;gap:6px;margin-bottom:8px;';
+            wrap.innerHTML =
+                '<input class="im-name" placeholder="Full name" style="padding:8px;border:1px solid var(--border);border-radius:6px;">' +
+                '<input class="im-role" placeholder="Role (e.g. Co-Investigator)" style="padding:8px;border:1px solid var(--border);border-radius:6px;">' +
+                '<button type="button" onclick="this.parentNode.remove()" title="Remove" ' +
+                'style="background:#fee2e2;color:#b91c1c;border:none;border-radius:6px;padding:0 12px;cursor:pointer;font-weight:700;">✕</button>' +
+                '<input class="im-qual" placeholder="Qualifications (e.g. PhD)" style="padding:8px;border:1px solid var(--border);border-radius:6px;">' +
+                '<input class="im-email" placeholder="Email / ID" style="padding:8px;border:1px solid var(--border);border-radius:6px;">' +
+                '<input class="im-mobile" placeholder="Mobile" style="padding:8px;border:1px solid var(--border);border-radius:6px;">';
+            document.getElementById('iacuc-team').appendChild(wrap);
+        };
+
+        window.submitIacuc = async function() {
+            const btn = document.getElementById('iacuc-generate-btn');
+            const team = [];
+            document.querySelectorAll('#iacuc-team .iacuc-member').forEach(row => {
+                const name = row.querySelector('.im-name').value.trim();
+                if (!name) return;
+                team.push({
+                    name,
+                    role: row.querySelector('.im-role').value.trim(),
+                    qualifications: row.querySelector('.im-qual').value.trim(),
+                    email: row.querySelector('.im-email').value.trim(),
+                    mobile: row.querySelector('.im-mobile').value.trim(),
+                    institution: ''
+                });
+            });
+            const payload = {
+                study: window.__lastStudy || {},
+                groups: window.__lastGroups || [],
+                analysis: window.__lastAnalysis || [],
+                admin: {
+                    funding_source: document.getElementById('iacuc-funding').value.trim(),
+                    housing_type: document.getElementById('iacuc-housing').value,
+                    team
+                }
+            };
+            const orig = btn.textContent;
+            btn.disabled = true; btn.textContent = 'Generating…';
+            try {
+                const resp = await fetch('/iacuc/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (!resp.ok) {
+                    let msg = 'Server error ' + resp.status;
+                    try { const e = await resp.json(); if (e.error) msg = e.error; } catch (_) {}
+                    throw new Error(msg);
+                }
+                const blob = await resp.blob();
+                const cd = resp.headers.get('Content-Disposition') || '';
+                const m = cd.match(/filename="?([^"]+)"?/);
+                const fname = m ? m[1] : 'IACUC_form.docx';
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url; a.download = fname;
+                document.body.appendChild(a); a.click(); a.remove();
+                URL.revokeObjectURL(url);
+                closeIacucModal();
+            } catch (err) {
+                alert('Could not generate the IACUC form: ' + err.message);
+            } finally {
+                btn.disabled = false; btn.textContent = orig;
+            }
         };
 
         // Export functions

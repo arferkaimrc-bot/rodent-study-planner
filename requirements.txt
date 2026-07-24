@@ -16,6 +16,7 @@ tenacity==8.2.2
 MarkupSafe==3.0.3
 reportlab==4.0.4
 python-docx==0.8.11
+docxtpl==0.16.7          # Jinja-for-Word — auto-fills the IACUC ethics form
 marshmallow==3.20.1
 
 # Authentication & access control

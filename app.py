@@ -49,6 +49,7 @@ from docx.shared import Inches, Pt, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
+from iacuc_generator import generate_iacuc_docx
 
 # Statistical packages
 from scipy import stats
@@ -4638,6 +4639,37 @@ def study_plan_docx():
     except Exception as e:
         logger.exception("Error generating DOCX")
         return jsonify({"error": "DOCX generation failed", "details": str(e)}), 500
+
+
+@app.route('/iacuc/generate', methods=['POST'])
+def iacuc_generate():
+    """Auto-fill the KAIMRC IACUC Animal Ethics form (.docx) from the analysis.
+
+    Body (JSON): {study, groups, analysis, admin} — see iacuc_generator.
+    The scientific narrative is synthesised from the platform's analysis; the
+    researcher supplies only administrative details (team, funding, housing).
+    Nothing is persisted.
+    """
+    try:
+        payload = request.get_json(silent=True) or {}
+        if not payload.get("groups"):
+            return jsonify({"error": "No study groups provided. Run an analysis first."}), 400
+        buffer = generate_iacuc_docx(payload)
+        title = (payload.get("study") or {}).get("study_title") or "study"
+        safe = re.sub(r'[^A-Za-z0-9_-]+', '_', title).strip('_')[:60] or "study"
+        return send_file(
+            buffer,
+            as_attachment=True,
+            download_name=f"IACUC_{safe}.docx",
+            mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        )
+    except FileNotFoundError as e:
+        logger.error(f"IACUC template missing: {e}")
+        return jsonify({"error": "IACUC template not found on server."}), 500
+    except Exception as e:
+        logger.exception("Error generating IACUC form")
+        return jsonify({"error": "IACUC generation failed", "details": str(e)}), 500
+
 
 @app.route('/calculate-blood', methods=['POST'])
 def calculate_blood():
