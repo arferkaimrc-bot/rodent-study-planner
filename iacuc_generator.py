@@ -245,6 +245,11 @@ def _procedures_overview(rows, acclim_days=""):
     if samples:
         lines.append(f"• Biological sample collection: {_list_sentence(samples)}.")
     lines.append("• Humane euthanasia and tissue collection at the study endpoint.")
+    # per-group special instructions supplied by the researcher
+    for g, _, _ in rows:
+        ins = _s(g.get("instructions"))
+        if ins:
+            lines.append(f"• Special instructions ({_s(g.get('group_name'), 'Group')}): {ins}")
     # a representative timeline, if available
     tl = None
     for _, _, s in rows:
@@ -445,6 +450,53 @@ def _tick_sdt(sdt, checked=True):
 def _cell_checkboxes(cell):
     return [s for s in cell._element.findall('.//' + qn('w:sdt'))
             if s.find('.//' + qn('w14:checkbox')) is not None]
+
+
+def _tick_row_checkbox(table, row_idx, checked=True):
+    """Tick the first checkbox content control anywhere in a row (some form
+    checkboxes live outside clean cell boundaries — e.g. the emergency Yes/No)."""
+    tr = table.rows[row_idx]._tr
+    for sdt in tr.iter(qn('w:sdt')):
+        if sdt.find('.//' + qn('w14:checkbox')) is not None:
+            _tick_sdt(sdt, checked)
+            return True
+    return False
+
+
+def _write_row_textbox(table, row_idx, text, n=0):
+    """Write into the n-th plain-text content control in a row (n<0 counts from
+    the end). Used for the emergency 'special instructions' and phone boxes."""
+    boxes = [s for s in table.rows[row_idx]._tr.iter(qn('w:sdt'))
+             if s.find('.//' + qn('w14:checkbox')) is None
+             and s.find(qn('w:sdtContent')) is not None]
+    if not boxes:
+        return False
+    sdt = boxes[n if n >= 0 else len(boxes) + n]
+    content = sdt.find(qn('w:sdtContent'))
+    p = content.find(qn('w:p'))
+    if p is None:
+        p = content.find('.//' + qn('w:p'))
+    if p is not None:
+        _set_para_el(p, text)
+        _left_align(p)
+        return True
+    # inline text content control: sdtContent > w:r > w:t (no paragraph)
+    runs = content.findall(qn('w:r'))
+    if runs:
+        ts = runs[0].findall(qn('w:t'))
+        if ts:
+            ts[0].text = text
+            for x in ts[1:]:
+                x.text = ''
+        else:
+            tt = runs[0].makeelement(qn('w:t'), {})
+            tt.set(qn('xml:space'), 'preserve')
+            tt.text = text
+            runs[0].append(tt)
+        for r in runs[1:]:
+            r.getparent().remove(r)
+        return True
+    return False
 
 
 def _check(cell, cb_index=0, checked=True):
@@ -729,6 +781,33 @@ def fill_form_controls(doc, rows, admin, study):
     loc_cb = {'riyadh': 0, 'jeddah': 1, 'al ahsa': 2, 'alahsa': 2}
     loc = _s((admin or {}).get('facility_location')).lower()
     cbr(11, 0, loc_cb.get(loc, 0), 0)            # default Riyadh
+
+    # ── PART 1 F — emergency instructions + declarations (auto-agree) ──────
+    instr_bits = []
+    for g, _, _ in rows:
+        ins = _s(g.get('instructions'))
+        if ins:
+            instr_bits.append(f"{_s(g.get('group_name'), 'Group')}: {ins}")
+    special = "; ".join(dict.fromkeys(instr_bits))
+    try:
+        if special:
+            _tick_row_checkbox(T[5], 10)             # YES – special instructions apply
+            _write_row_textbox(T[5], 12, special, 0)  # …provide them (box lives in r12)
+        else:
+            _tick_row_checkbox(T[5], 9)              # NO – vet may use professional judgment
+    except Exception:
+        pass
+    phone = _s((admin or {}).get('emergency_phone'))
+    if phone:
+        try:
+            _write_row_textbox(T[5], 13, phone, -1)   # emergency phone box (r13)
+        except Exception:
+            pass
+    cbr(5, 14, 5, 0)                                 # "I understand… I agree" statement
+    try:
+        cbr(121, 1, 0, 0)                            # Appendix 2: "I AGREE WITH ALL THE ABOVE"
+    except Exception:
+        pass
 
     # ── PART 5 — housing, diet, husbandry ─────────────────────────────────
     cb(26, 2)                                    # housed at another facility? NO

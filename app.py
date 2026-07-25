@@ -4139,6 +4139,36 @@ def generate_enhanced_pdf(study_data):
         story.append(tl_table)
         story.append(Spacer(1, 0.12*inch))
 
+    # Special instructions (per group) — shown prominently right after timeline
+    special_rows = [(g.get('group_name', f'Group {i}'), (g.get('instructions') or '').strip())
+                    for i, g in enumerate(groups, 1)]
+    special_rows = [(n, ins) for n, ins in special_rows if ins]
+    if special_rows:
+        si_header = [[Paragraph("📌 Special Instructions", heading_style)]]
+        si_ht = Table(si_header, colWidths=[7*inch])
+        si_ht.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, -1), HexColor('#fffbeb')),
+            ('BOX', (0, 0), (-1, -1), 1, HexColor('#f59e0b')),
+            ('LEFTPADDING', (0, 0), (-1, -1), 8),
+            ('TOPPADDING', (0, 0), (-1, -1), 4), ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ]))
+        story.append(si_ht)
+        story.append(Spacer(1, 0.04*inch))
+        si_cell = ParagraphStyle('si', fontName='Helvetica', fontSize=8, leading=11)
+        si_lbl = ParagraphStyle('sil', fontName='Helvetica-Bold', fontSize=8, leading=11)
+        si_data = [[Paragraph(escape(n), si_lbl), Paragraph(escape(ins), si_cell)]
+                   for n, ins in special_rows]
+        si_table = Table(si_data, colWidths=[1.8*inch, 5.2*inch])
+        si_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, -1), HexColor('#fffef5')),
+            ('GRID', (0, 0), (-1, -1), 0.5, HexColor('#fde68a')),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 6), ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+            ('TOPPADDING', (0, 0), (-1, -1), 4), ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ]))
+        story.append(si_table)
+        story.append(Spacer(1, 0.12*inch))
+
     # Experimental Groups - Detailed Analysis Section
     if groups:
         groups_header_data = [[Paragraph("🧪 Experimental Groups - Detailed Analysis", heading_style)]]
@@ -4543,9 +4573,28 @@ def generate_enhanced_docx(study_data):
     # Editable day-by-day protocol timeline (from the results / user edits)
     doc.add_paragraph()
     add_protocol_timelines_to_docx(doc, study_data.get('timelines', []))
-    
+
+    # Special instructions (per group) — prominent, right after the timeline
+    special_rows = [(g.get('group_name', f'Group {i}'), (g.get('instructions') or '').strip())
+                    for i, g in enumerate(groups, 1)]
+    special_rows = [(n, ins) for n, ins in special_rows if ins]
+    if special_rows:
+        doc.add_paragraph()
+        doc.add_heading("📌 Special Instructions", level=1)
+        si_tbl = doc.add_table(rows=len(special_rows), cols=2)
+        si_tbl.style = 'Light Grid Accent 1'
+        for i, (n, ins) in enumerate(special_rows):
+            si_tbl.rows[i].cells[0].text = n
+            if si_tbl.rows[i].cells[0].paragraphs[0].runs:
+                si_tbl.rows[i].cells[0].paragraphs[0].runs[0].font.bold = True
+            si_tbl.rows[i].cells[1].text = ins
+            for cell in si_tbl.rows[i].cells:
+                shd = OxmlElement('w:shd')
+                shd.set(qn('w:fill'), 'fffbeb')
+                cell._element.get_or_add_tcPr().append(shd)
+
     doc.add_paragraph()
-    
+
     doc.add_paragraph()
     
     # Disclaimer
