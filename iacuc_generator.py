@@ -227,8 +227,11 @@ def _research_aims(rows):
     return _bullets(aims)
 
 
-def _procedures_overview(rows):
+def _procedures_overview(rows, acclim_days=""):
     lines = ["Overview of procedures and manipulations:"]
+    acclim = _s(acclim_days)
+    if acclim:
+        lines.append(f"• Acclimatization period: {acclim} days prior to any procedure.")
     for g, _, s in rows:
         if _is_control(g):
             continue
@@ -345,8 +348,11 @@ def _team(admin, study):
     pi = _s(study.get("pi_name"))
     inst = _s(study.get("institution"), "KAIMRC")
     if pi:
-        team.append({"name": pi, "role": "Principal Investigator", "qualifications": "",
-                     "institution": inst, "email": "", "mobile": ""})
+        team.append({"name": pi, "role": "Principal Investigator",
+                     "qualifications": _s(admin.get("pi_qualifications")),
+                     "institution": inst,
+                     "email": _s(admin.get("pi_email")),
+                     "mobile": _s(admin.get("pi_mobile"))})
     for m in (admin.get("team") or []):
         if not isinstance(m, dict):
             continue
@@ -363,7 +369,8 @@ def _team(admin, study):
     return team[:6]
 
 
-def _animals(rows):
+def _animals(rows, source="Accredited vendor"):
+    source = _s(source, "Accredited vendor")
     animals = []
     for g, _, s in rows:
         sp = _s(s.get("species") or g.get("species"), "Mouse")
@@ -373,7 +380,7 @@ def _animals(rows):
         age = f"{age} wk" if age and "wk" not in age.lower() and "week" not in age.lower() else (age or "—")
         total = _s(s.get("planned_animals") or g.get("num_mice"), "—")
         animals.append({"species": sp, "strain": strain or "—", "sex": sex,
-                        "age": age, "total": total, "source": "Accredited vendor"})
+                        "age": age, "total": total, "source": source})
     return animals[:6]
 
 
@@ -403,7 +410,7 @@ def build_context(payload):
         "scientific_justification": _scientific_justification(rows),
         "literature_background": _literature_background(rows),
         "research_aims": _research_aims(rows),
-        "procedures_overview": _procedures_overview(rows),
+        "procedures_overview": _procedures_overview(rows, admin.get("acclimatization_days")),
         "experimental_endpoints": _experimental_endpoints(rows),
         "humane_endpoints": _humane_endpoints(rows),
         "observation_frequency": _observation_frequency(rows),
@@ -630,7 +637,7 @@ def fill_form_controls(doc, rows, admin, study):
                               m['institution'], m['email'], m['mobile']])
         except Exception:
             pass
-    animals = _animals(rows)
+    animals = _animals(rows, (admin or {}).get('animal_source'))
     for i, an in enumerate(animals[:6]):
         r = 1 + i
         if r >= len(T[10].rows):
@@ -713,6 +720,15 @@ def fill_form_controls(doc, rows, admin, study):
             _write_cell(T[13].rows[6].cells[6], str(total))
         except Exception:
             pass
+
+    # ── PART 1 — funding agency (T5) & PART 3 — housing location (T11) ─────
+    fund_cb = {'kaimrc': 0, 'moe': 3, 'moh': 4, 'rdia': 8, 'snih': 9, 'other': 11}
+    ag = _s((admin or {}).get('funding_agency')).lower()
+    if ag in fund_cb:
+        cbr(5, 1, fund_cb[ag], 0)
+    loc_cb = {'riyadh': 0, 'jeddah': 1, 'al ahsa': 2, 'alahsa': 2}
+    loc = _s((admin or {}).get('facility_location')).lower()
+    cbr(11, 0, loc_cb.get(loc, 0), 0)            # default Riyadh
 
     # ── PART 5 — housing, diet, husbandry ─────────────────────────────────
     cb(26, 2)                                    # housed at another facility? NO

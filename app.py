@@ -3153,8 +3153,8 @@ def get_prediction_and_suggestion(group, all_groups_count=1):
     blood_calc = BloodQuantityCalculator.calculate_blood_needed(
         sample_types=group.get('sample_types', []),
         weight_g=parse_float_safe(group.get('weight'), 25),
-        timepoints=1,
-        num_replicates=1
+        timepoints=max(1, int(parse_float_safe(group.get('blood_timepoints'), 1))),
+        num_replicates=max(1, int(parse_float_safe(group.get('blood_replicates'), 1)))
     )
 
     def build_summary(recommended_range):

@@ -921,18 +921,78 @@
         </div>
         <div style="padding:20px 22px;max-height:60vh;overflow-y:auto;">
 
-          <label style="font-weight:700;font-size:.9rem;">💰 Funding source</label>
-          <input id="iacuc-funding" type="text" placeholder="e.g., KAIMRC intramural grant #RC-2026"
-            style="width:100%;padding:10px;margin:6px 0 16px;border:1px solid var(--border);border-radius:8px;">
+          <style>
+            .ichip-row { display:flex; flex-wrap:wrap; gap:6px; margin:6px 0 14px; }
+            .ichip { padding:7px 14px; border:1.5px solid var(--border); border-radius:20px;
+                     background:#fff; cursor:pointer; font-size:.85rem; font-weight:600; color:#334155; }
+            .ichip.sel { background:linear-gradient(180deg,#8b5cf6,#6d28d9); color:#fff; border-color:#6d28d9; }
+            .ilabel { font-weight:700; font-size:.9rem; display:block; margin-top:2px; }
+          </style>
+          <div style="font-size:.82rem;color:#64748b;margin:0 0 12px;">
+            Just tap the right option in each row — sensible defaults are pre-selected.</div>
 
-          <label style="font-weight:700;font-size:.9rem;">🏠 Housing type</label>
-          <select id="iacuc-housing"
-            style="width:100%;padding:10px;margin:6px 0 16px;border:1px solid var(--border);border-radius:8px;">
-            <option value="standard">Standard housing</option>
-            <option value="absl">ABSL (biocontainment) housing</option>
-          </select>
+          <label class="ilabel">💰 Funding agency</label>
+          <div class="ichip-row" data-field="funding_agency">
+            <button type="button" class="ichip sel" data-value="KAIMRC">KAIMRC</button>
+            <button type="button" class="ichip" data-value="MOE">MOE</button>
+            <button type="button" class="ichip" data-value="MOH">MOH</button>
+            <button type="button" class="ichip" data-value="RDIA">RDIA</button>
+            <button type="button" class="ichip" data-value="SNIH">SNIH</button>
+            <button type="button" class="ichip" data-value="Other">Other</button>
+          </div>
 
-          <label style="font-weight:700;font-size:.9rem;">👥 Research team members</label>
+          <label class="ilabel">📍 Facility location</label>
+          <div class="ichip-row" data-field="facility_location">
+            <button type="button" class="ichip sel" data-value="Riyadh">Riyadh</button>
+            <button type="button" class="ichip" data-value="Jeddah">Jeddah</button>
+            <button type="button" class="ichip" data-value="Al Ahsa">Al Ahsa</button>
+          </div>
+
+          <label class="ilabel">🏠 Housing type</label>
+          <div class="ichip-row" data-field="housing_type">
+            <button type="button" class="ichip sel" data-value="standard">Standard</button>
+            <button type="button" class="ichip" data-value="absl">ABSL (biocontainment)</button>
+          </div>
+
+          <label class="ilabel">🐭 Animal source</label>
+          <div class="ichip-row" data-field="animal_source">
+            <button type="button" class="ichip sel" data-value="Accredited vendor">Accredited vendor</button>
+            <button type="button" class="ichip" data-value="Charles River">Charles River</button>
+            <button type="button" class="ichip" data-value="Jackson Laboratory">Jackson Lab</button>
+            <button type="button" class="ichip" data-value="KAIMRC breeding colony">KAIMRC breeding</button>
+          </div>
+
+          <label class="ilabel">🗓️ Acclimatization period</label>
+          <div class="ichip-row" data-field="acclimatization_days">
+            <button type="button" class="ichip" data-value="3">3 days</button>
+            <button type="button" class="ichip sel" data-value="7">7 days</button>
+            <button type="button" class="ichip" data-value="14">14 days</button>
+          </div>
+
+          <label class="ilabel">🎓 PI qualifications</label>
+          <div class="ichip-row" data-field="pi_qualifications">
+            <button type="button" class="ichip sel" data-value="PhD">PhD</button>
+            <button type="button" class="ichip" data-value="MD">MD</button>
+            <button type="button" class="ichip" data-value="DVM">DVM</button>
+            <button type="button" class="ichip" data-value="MSc">MSc</button>
+          </div>
+
+          <details style="margin:2px 0 14px;">
+            <summary style="cursor:pointer;font-weight:700;font-size:.82rem;color:#64748b;">
+              ➕ Optional details (grant #, contacts)</summary>
+            <div style="margin-top:8px;display:grid;gap:8px;">
+              <input id="iacuc-funding" type="text" placeholder="Grant / IRB number (optional)"
+                style="width:100%;padding:9px;border:1px solid var(--border);border-radius:8px;">
+              <input id="iacuc-pi-email" type="text" placeholder="PI email / ID (optional)"
+                style="width:100%;padding:9px;border:1px solid var(--border);border-radius:8px;">
+              <input id="iacuc-pi-mobile" type="text" placeholder="PI mobile (optional)"
+                style="width:100%;padding:9px;border:1px solid var(--border);border-radius:8px;">
+              <input id="iacuc-emergency" type="text" placeholder="Emergency phone (optional)"
+                style="width:100%;padding:9px;border:1px solid var(--border);border-radius:8px;">
+            </div>
+          </details>
+
+          <label class="ilabel">👥 Research team members</label>
           <div style="font-size:.8rem;color:#64748b;margin:2px 0 8px;">
             The PI is added automatically from the study details. Add co-investigators / staff.</div>
           <div id="iacuc-team"></div>
@@ -1884,6 +1944,21 @@
             document.getElementById('iacuc-overlay').style.display = 'none';
         };
 
+        // Single-select chip rows in the IACUC modal (one tap = one choice)
+        document.addEventListener('click', function(e) {
+            const chip = e.target.closest('.ichip');
+            if (!chip) return;
+            const row = chip.closest('.ichip-row');
+            if (!row) return;
+            row.querySelectorAll('.ichip').forEach(c => c.classList.remove('sel'));
+            chip.classList.add('sel');
+        });
+        function iacucChip(field) {
+            const row = document.querySelector('.ichip-row[data-field="' + field + '"]');
+            const sel = row && row.querySelector('.ichip.sel');
+            return sel ? sel.getAttribute('data-value') : '';
+        }
+
         window.addIacucMember = function() {
             const wrap = document.createElement('div');
             wrap.className = 'iacuc-member';
@@ -1919,8 +1994,16 @@
                 groups: window.__lastGroups || [],
                 analysis: window.__lastAnalysis || [],
                 admin: {
+                    funding_agency: iacucChip('funding_agency'),
                     funding_source: document.getElementById('iacuc-funding').value.trim(),
-                    housing_type: document.getElementById('iacuc-housing').value,
+                    facility_location: iacucChip('facility_location'),
+                    housing_type: iacucChip('housing_type') || 'standard',
+                    animal_source: iacucChip('animal_source'),
+                    acclimatization_days: iacucChip('acclimatization_days'),
+                    pi_qualifications: iacucChip('pi_qualifications'),
+                    pi_email: document.getElementById('iacuc-pi-email').value.trim(),
+                    pi_mobile: document.getElementById('iacuc-pi-mobile').value.trim(),
+                    emergency_phone: document.getElementById('iacuc-emergency').value.trim(),
                     team
                 }
             };
