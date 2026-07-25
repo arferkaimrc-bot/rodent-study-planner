@@ -61,6 +61,8 @@ def _list_sentence(items, joiner="and"):
         return ""
     if len(items) == 1:
         return items[0]
+    if len(items) == 2:
+        return f"{items[0]} {joiner} {items[1]}"
     return ", ".join(items[:-1]) + f", {joiner} " + items[-1]
 
 
@@ -90,6 +92,39 @@ def _is_control(g):
 
 # ── narrative builders (each returns one answer-box string) ────────────────
 
+_SPECIES_PLURAL = {"mouse": "mice", "rat": "rats"}
+
+
+def _plural_species(sp):
+    s = _s(sp, "animals").lower()
+    return _SPECIES_PLURAL.get(s, s + "s" if s and not s.endswith("s") else (s or "animals"))
+
+
+def _drugs(rows):
+    return _join_unique(_s(g.get("drug_name")) for g, _, _ in rows if not _is_control(g))
+
+
+def _format_reference(p, n):
+    """Format one reference like a journal citation, with an accessible link."""
+    authors = _s(p.get("authors"))
+    year = _s(p.get("year"))
+    title = _s(p.get("title"))
+    url = _s(p.get("url"))
+    doi = _s(p.get("doi"))
+    link = url or (f"https://doi.org/{doi}" if doi else "")
+    cite = ""
+    if authors:
+        cite += authors + (" et al. " if "," in authors else " ")
+    if year:
+        cite += f"({year}). "
+    cite += title
+    if not cite.rstrip().endswith("."):
+        cite += "."
+    if link:
+        cite += f" Available at: {link}"
+    return f"{n}. {cite}"
+
+
 def _study_purpose(rows, study):
     drugs = _join_unique(_s(g.get("drug_name")) for g, _, _ in rows if not _is_control(g))
     paradigms = _join_unique(_s(g.get("experiment_type")) for g, _, _ in rows)
@@ -107,45 +142,51 @@ def _study_purpose(rows, study):
 
 
 def _what_done(rows):
-    lines = []
+    lines = ["Animals are allocated to the following groups:"]
     for g, _, s in rows:
         gname = _s(g.get("group_name"), "Group")
         n = _s(s.get("planned_animals") or g.get("num_mice"), "n")
-        sp = _s(s.get("species") or g.get("species"), "rodents")
+        sp = _plural_species(s.get("species") or g.get("species"))
+        route = _s(g.get("route"), "the assigned route")
+        route_txt = route if ("route" in route.lower() or "(" in route) else f"the {route} route"
         if _is_control(g):
-            lines.append(f"{gname}: {n} {sp.lower()} receive the vehicle/control by "
-                         f"{_s(g.get('route'),'the same route')} and are handled identically "
-                         f"to the treatment groups.")
+            lines.append(f"• {gname}: {n} {sp} receive the vehicle/control by {route_txt}, "
+                         f"handled identically to the treatment group(s).")
         else:
             drug = _s(g.get("drug_name"), "the test article")
             dose = _s(g.get("dose"))
-            route = _s(g.get("route"), "the assigned route")
             dose_txt = f" at {dose} mg/kg" if dose else ""
-            lines.append(f"{gname}: {n} {sp.lower()} receive {drug}{dose_txt} via {route}, "
-                         f"followed by clinical observation and scheduled sample collection.")
-    lines.append("Animals are weighed and observed regularly; biological samples are "
-                 "collected at defined time-points, after which animals are humanely euthanised.")
+            lines.append(f"• {gname}: {n} {sp} receive {drug}{dose_txt} by {route_txt}.")
+    lines.append("All animals are weighed and observed regularly for clinical signs; biological "
+                 "samples are collected at defined time-points, after which animals are humanely "
+                 "euthanised and tissues collected.")
     return "\n".join(lines)
 
 
 def _expected_outcomes(rows):
+    drugs = _drugs(rows)
     organs = _join_unique(_s(g.get("target_organ")) for g, _, _ in rows
                           if _s(g.get("target_organ")).lower() not in ("", "general", "none"))
     eps = _join_unique(e for g, _, _ in rows for e in (g.get("toxicity_endpoints") or []))
-    out = ["The study is expected to characterise the dose–response and safety profile "
-           "of the test article(s) in the chosen model."]
+    lead = _list_sentence(drugs) or "the test article(s)"
+    out = [f"The study is expected to characterise the dose–response and safety profile of "
+           f"{lead} in the chosen rodent model."]
     if organs:
-        out.append(f"Particular attention is paid to effects on the {_list_sentence(organs)}.")
+        out.append(f"Particular attention is paid to potential effects on the {_list_sentence(organs)}.")
     if eps:
         out.append(f"Assessed endpoints include {_list_sentence(eps)}.")
+    out.append("The results will define a tolerable dose range and the clinical signs that "
+               "signal toxicity, guiding the design of subsequent studies.")
     return " ".join(out)
 
 
 def _study_benefit(rows):
+    drugs = _drugs(rows)
     paradigms = _join_unique(_s(g.get("experiment_type")) for g, _, _ in rows)
-    txt = ("The findings will improve understanding of the efficacy and safety of the "
-           "test article(s), informing safer dose selection and reducing risk in "
-           "subsequent research and, ultimately, clinical development.")
+    lead = _list_sentence(drugs) or "the test article(s)"
+    txt = (f"The findings will improve understanding of the efficacy and safety of {lead}, "
+           "informing safer dose selection and reducing risk in subsequent research and, "
+           "ultimately, clinical development.")
     if paradigms:
         txt += f" This advances {_list_sentence(paradigms)} research and may benefit " \
                "both human and animal health."
@@ -186,45 +227,91 @@ def _drug_overview_url(s):
     return _s(ov.get("reference_url")) if isinstance(ov, dict) else ""
 
 
-def _literature_background(rows):
-    # Real, on-topic references only: the compound summaries and the papers the
-    # platform's literature search returned — never fabricated.
-    overviews, refs = [], []
-    for _, _, s in rows:
-        desc = _drug_overview_text(s)
-        if desc:
-            overviews.append(desc)
-        url = _drug_overview_url(s)
-        if url:
-            refs.append(url)
+def _relevant_papers(rows, drugs, organs):
+    """Keep only papers whose title is on-topic (mentions the compound, target
+    organ, or toxicology terms) — a professional reference list, not a dump of
+    loosely-matched search hits."""
+    keys = [d.lower() for d in drugs] + [o.lower() for o in organs] + \
+           ["toxic", "toxicit", "safety", "pharmacokinet", "dose", "hepato",
+            "nephro", "cardio", "adverse", "ld50", "in vivo", "rodent", "mouse", "rat"]
+    seen, out = set(), []
     for _, a, _ in rows:
-        for p in (a.get("reference_papers") or [])[:3]:
-            t = _s(p.get("title") if isinstance(p, dict) else p)
-            yr = _s(p.get("year")) if isinstance(p, dict) else ""
-            if t:
-                refs.append(f"{t}" + (f" ({yr})" if yr else ""))
-    out = []
+        for p in (a.get("reference_papers") or []):
+            if not isinstance(p, dict):
+                continue
+            title = _s(p.get("title"))
+            if not title or title.lower() in seen:
+                continue
+            if any(k in title.lower() for k in keys):
+                seen.add(title.lower())
+                out.append(p)
+    return out
+
+
+def _literature_background(rows):
+    drugs = _drugs(rows)
+    paradigms = _join_unique(_s(g.get("experiment_type")) for g, _, _ in rows)
+    organs = _join_unique(_s(g.get("target_organ")) for g, _, _ in rows
+                          if _s(g.get("target_organ")).lower() not in ("", "general", "none"))
+    overviews = _join_unique(_drug_overview_text(s) for _, _, s in rows if _drug_overview_text(s))
+    lead = _list_sentence(drugs) or "the test article(s)"
+    is_are = "is" if len(drugs) == 1 else "are"
+
+    paras = []
+    # 1) What the test article is — from the real compound summary
     if overviews:
-        out.append(_join_unique(overviews)[0])
-    out.append("The proposed work builds on existing pharmacological and toxicological "
-               "literature for the test article(s) and study paradigm.")
-    refs = _join_unique(refs)
+        paras.append(" ".join(overviews[:2]))
+    # 2) Rationale for an in-vivo study
+    p2 = (f"{lead} {is_are} the focus of this study, which falls within "
+          f"{_list_sentence(paradigms) or 'preclinical toxicology'} research. Preclinical "
+          "evaluation in a living mammalian system is an essential step before a compound can "
+          "advance: it characterises the dose–response relationship, systemic exposure "
+          "(absorption, distribution, metabolism and excretion) and target-organ effects that "
+          "cannot be reproduced by in-vitro or in-silico methods alone.")
+    if organs:
+        p2 += f" In this protocol, particular attention is given to the {_list_sentence(organs)}."
+    paras.append(p2)
+    # 3) How the design was informed
+    paras.append("Published pharmacological and toxicological literature, together with curated "
+                 "chemical/bioactivity databases (PubChem, ChEMBL) and a structured literature "
+                 "search, were reviewed during study design to inform species selection, the dose "
+                 "range, sample-size and the clinical and histopathological monitoring endpoints.")
+
+    # References — professional, accessible, on-topic only
+    refs, n = [], 1
+    for _, _, s in rows:
+        u = _drug_overview_url(s)
+        if u:
+            refs.append(f"{n}. Compound safety summary (regulatory/authoritative source). "
+                        f"Available at: {u}")
+            n += 1
+            break
+    for p in _relevant_papers(rows, drugs, organs)[:6]:
+        refs.append(_format_reference(p, n))
+        n += 1
+
+    text = "\n\n".join(paras)
     if refs:
-        out.append("References identified during study design:")
-        out.append(_bullets(refs[:6]))
-    return "\n".join(out)
+        text += "\n\nReferences identified during study design:\n" + "\n".join(refs)
+    return text
 
 
 def _research_aims(rows):
-    aims = ["Determine the biological response and tolerability of the test article(s) "
-            "at the selected dose level(s) in the chosen rodent model."]
+    drugs = _drugs(rows)
     organs = _join_unique(_s(g.get("target_organ")) for g, _, _ in rows
                           if _s(g.get("target_organ")).lower() not in ("", "general", "none"))
+    eps = _join_unique(e for g, _, _ in rows for e in (g.get("toxicity_endpoints") or []))
+    lead = _list_sentence(drugs) or "the test article(s)"
+    aims = [f"Characterise the biological response and tolerability of {lead} at the selected "
+            "dose level(s) in the chosen rodent model."]
     if organs:
-        aims.append(f"Assess potential target-organ effects on the {_list_sentence(organs)}.")
+        aims.append(f"Evaluate potential target-organ toxicity affecting the {_list_sentence(organs)}.")
+    if eps:
+        aims.append(f"Assess the defined toxicity endpoints: {_list_sentence(eps)}.")
     aims.append("Compare treatment groups against concurrent controls to establish a "
                 "dose–response relationship.")
-    return _bullets(aims)
+    aims.append("Define humane endpoints and inform safe dosing for subsequent studies.")
+    return "\n".join(f"{i}. {a}" for i, a in enumerate(aims, 1))
 
 
 def _procedures_overview(rows, acclim_days=""):
