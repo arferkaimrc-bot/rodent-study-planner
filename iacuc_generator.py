@@ -257,32 +257,24 @@ def _literature_background(rows):
     lead = _list_sentence(drugs) or "the test article(s)"
     is_are = "is" if len(drugs) == 1 else "are"
 
+    # Subject-focused background only (no meta commentary about how the study was
+    # designed or which databases were consulted) — followed by the references.
     paras = []
-    # 1) What the test article is — from the real compound summary
     if overviews:
         paras.append(" ".join(overviews[:2]))
-    # 2) Rationale for an in-vivo study
-    p2 = (f"{lead} {is_are} the focus of this study, which falls within "
-          f"{_list_sentence(paradigms) or 'preclinical toxicology'} research. Preclinical "
-          "evaluation in a living mammalian system is an essential step before a compound can "
-          "advance: it characterises the dose–response relationship, systemic exposure "
-          "(absorption, distribution, metabolism and excretion) and target-organ effects that "
-          "cannot be reproduced by in-vitro or in-silico methods alone.")
+    subj = f"{lead} {is_are} of toxicological interest"
     if organs:
-        p2 += f" In this protocol, particular attention is given to the {_list_sentence(organs)}."
-    paras.append(p2)
-    # 3) How the design was informed
-    paras.append("Published pharmacological and toxicological literature, together with curated "
-                 "chemical/bioactivity databases (PubChem, ChEMBL) and a structured literature "
-                 "search, were reviewed during study design to inform species selection, the dose "
-                 "range, sample-size and the clinical and histopathological monitoring endpoints.")
+        subj += f", with particular relevance to the {_list_sentence(organs)}"
+    subj += (". The present study examines the dose–response relationship and target-organ "
+             "effects of the compound in a rodent model.")
+    paras.append(subj)
 
     # References — professional, accessible, on-topic only
     refs, n = [], 1
     for _, _, s in rows:
         u = _drug_overview_url(s)
         if u:
-            refs.append(f"{n}. Compound safety summary (regulatory/authoritative source). "
+            refs.append(f"{n}. Compound safety summary (authoritative source). "
                         f"Available at: {u}")
             n += 1
             break
@@ -292,7 +284,7 @@ def _literature_background(rows):
 
     text = "\n\n".join(paras)
     if refs:
-        text += "\n\nReferences identified during study design:\n" + "\n".join(refs)
+        text += "\n\nReferences:\n" + "\n".join(refs)
     return text
 
 
@@ -537,6 +529,15 @@ def _tick_sdt(sdt, checked=True):
 def _cell_checkboxes(cell):
     return [s for s in cell._element.findall('.//' + qn('w:sdt'))
             if s.find('.//' + qn('w14:checkbox')) is not None]
+
+
+def _unlock_content_controls(doc):
+    """Remove content-control locks so the researcher can freely edit every
+    answer box after download (the blank form locks ~21 controls)."""
+    for lock in doc.element.body.findall('.//' + qn('w:lock')):
+        parent = lock.getparent()
+        if parent is not None:
+            parent.remove(lock)
 
 
 def _tick_row_checkbox(table, row_idx, checked=True):
@@ -930,6 +931,32 @@ def fill_form_controls(doc, rows, admin, study):
     box(65, "A secondary physical method (cervical dislocation or exsanguination) "
             "is applied to confirm death.")
 
+    # ── PART 9 — collection of body fluids/tissues from living animals ─────
+    blood_samples, vol = [], ""
+    for g, _, s in rows:
+        for x in list(g.get('sample_types') or []) + list(s.get('recommended_samples') or []):
+            xl = _s(x).lower()
+            if any(k in xl for k in ('blood', 'plasma', 'serum')) and _s(x) not in blood_samples:
+                blood_samples.append(_s(x))
+        bv = s.get('blood_volume_ml')
+        if bv and not vol:
+            vol = f"≤ {bv} mL (within safe blood-volume limits)"
+    if not vol:
+        vol = "Within safe blood-volume limits"
+    if blood_samples:
+        for i, samp in enumerate(blood_samples[:3]):
+            try:
+                _fill_struct_row(T[67].rows[1 + i],
+                                 [samp, "At scheduled time-point / terminal", vol,
+                                  "Submandibular / tail vein (survival) or cardiac puncture (terminal)"])
+            except Exception:
+                pass
+        cb(68, 0)                                # anaesthetised/sedated? YES
+        row(69, 1, ["Isoflurane (suggested — confirm with veterinarian)",
+                    "To effect (2–3%)", "Inhalation", "To effect"])
+    else:
+        cb(66, 0)                                # NOT APPLICABLE (no living-animal fluid collection)
+
     # ── PART 11 — pain & distress management ──────────────────────────────
     if pain:
         cb(76, 0)                                # distress/pain expected? YES
@@ -959,6 +986,12 @@ def fill_form_controls(doc, rows, admin, study):
     cb(88, 2)                                    # neuromuscular blockers? NO
     cb(90, 2)                                    # non-survival practice animals? NO
     box(105, "Not applicable — no surgical procedures are performed in this protocol.")
+
+    # Make every answer box editable after download (unlock content controls).
+    try:
+        _unlock_content_controls(doc)
+    except Exception:
+        pass
 
 
 def generate_iacuc_docx(payload):
