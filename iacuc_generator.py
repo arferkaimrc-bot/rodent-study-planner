@@ -513,6 +513,43 @@ def build_context(payload):
 #  (docxtpl handles free text; Word form controls are set here directly).
 # ══════════════════════════════════════════════════════════════════════════
 
+# Everything the platform writes is marked with a light-blue (cyan) highlight so
+# the researcher can instantly tell auto-filled content from the original form.
+_HL = 'cyan'
+
+
+def _highlight_run(r):
+    rpr = r.find(qn('w:rPr'))
+    if rpr is None:
+        rpr = r.makeelement(qn('w:rPr'), {})
+        r.insert(0, rpr)
+    hl = rpr.find(qn('w:highlight'))
+    if hl is None:
+        hl = rpr.makeelement(qn('w:highlight'), {})
+        rpr.append(hl)
+    hl.set(qn('w:val'), _HL)
+
+
+def _highlight_para(p):
+    for r in p.findall(qn('w:r')):
+        _highlight_run(r)
+
+
+# The 1×1 narrative answer boxes filled by docxtpl (see build_template BOX_TAGS)
+# — highlight their whole content after rendering.
+_DOCXTPL_BOX_TABLES = [6, 7, 8, 9, 12, 17, 18, 19, 33, 57, 58, 59, 61, 63, 80, 81]
+
+
+def _highlight_docxtpl_boxes(doc):
+    for idx in _DOCXTPL_BOX_TABLES:
+        try:
+            tc = next(doc.tables[idx]._tbl.iter(qn('w:tc')))
+            for p in tc.iter(qn('w:p')):
+                _highlight_para(p)
+        except Exception:
+            pass
+
+
 def _tick_sdt(sdt, checked=True):
     """Flip a Word checkbox content control and swap its ☐/☒ display glyph."""
     ck = sdt.find('.//' + qn('w14:checked'))
@@ -524,6 +561,9 @@ def _tick_sdt(sdt, checked=True):
         for t in content.iter(qn('w:t')):
             t.text = ('☒' if checked else '☐') if first else ''
             first = False
+        if checked:                       # highlight the ticked box
+            for r in content.iter(qn('w:r')):
+                _highlight_run(r)
 
 
 def _cell_checkboxes(cell):
@@ -583,6 +623,7 @@ def _write_row_textbox(table, row_idx, text, n=0):
             runs[0].append(tt)
         for r in runs[1:]:
             r.getparent().remove(r)
+        _highlight_run(runs[0])
         return True
     return False
 
@@ -596,7 +637,8 @@ def _check(cell, cb_index=0, checked=True):
 
 
 def _set_para_el(p, text):
-    """Set a <w:p> element's text, preserving the first run's formatting."""
+    """Set a <w:p> element's text, preserving the first run's formatting, and
+    mark it with the platform's blue highlight."""
     runs = p.findall(qn('w:r'))
     if runs:
         ts = runs[0].findall(qn('w:t'))
@@ -618,6 +660,7 @@ def _set_para_el(p, text):
         t.text = text
         r.append(t)
         p.append(r)
+    _highlight_para(p)
 
 
 def _left_align(p):
@@ -987,7 +1030,9 @@ def fill_form_controls(doc, rows, admin, study):
     cb(90, 2)                                    # non-survival practice animals? NO
     box(105, "Not applicable — no surgical procedures are performed in this protocol.")
 
-    # Make every answer box editable after download (unlock content controls).
+    # Highlight the docxtpl-filled narrative boxes (blue), then make every
+    # answer box editable after download (unlock content controls).
+    _highlight_docxtpl_boxes(doc)
     try:
         _unlock_content_controls(doc)
     except Exception:
