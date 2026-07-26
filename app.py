@@ -2884,7 +2884,7 @@ def build_comprehensive_reference_corpus(group):
         "openalex": openalex_refs,
         "crossref": crossref_refs,
         "impc": impc_refs,
-        "all_papers": all_papers[:15]  # Top 15 papers
+        "all_papers": all_papers[:20]  # Top 20 papers
     }
 
 # ============================================================================
@@ -3282,7 +3282,7 @@ def get_prediction_and_suggestion(group, all_groups_count=1):
             "toxicity_risk": 0,
             "rationale": "Control group should match treatment groups.",
             "predicted_outcome": "No pharmacological effect expected.",
-            "reference_papers": ref_corpus.get("all_papers", [])[:5],
+            "reference_papers": ref_corpus.get("all_papers", [])[:15],
             "validation_score": 85,
             "warnings": warnings,
             "suggested_corrections": [],
@@ -3551,7 +3551,7 @@ def get_prediction_and_suggestion(group, all_groups_count=1):
         "toxicity_risk": 15,
         "rationale": rationale,
         "predicted_outcome": "Based on statistical power analysis and literature review.",
-        "reference_papers": all_papers_list[:10],
+        "reference_papers": all_papers_list[:15],
         "validation_score": score,
         "warnings": warnings,
         "suggested_corrections": corrections,

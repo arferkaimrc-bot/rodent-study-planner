@@ -248,18 +248,45 @@ def _relevant_papers(rows, drugs, organs):
     return out
 
 
-def _literature_background(rows):
+_OA_HOSTS = ("europepmc.org", "ncbi.nlm.nih.gov", "/pmc", "plos", "mdpi.com",
+             "frontiersin.org", "biomedcentral.com", "hindawi.com", "doaj",
+             "nature.com/articles", "elifesciences.org")
+
+
+def _is_open_access(p):
+    u = (_s(p.get("url")) or _s(p.get("doi"))).lower()
+    return any(h in u for h in _OA_HOSTS)
+
+
+def _select_references(rows, drugs, organs, want=10):
+    """Up to `want` on-topic references — open-access first, then others, with a
+    spread of publication years (a mix of recent and older work)."""
+    papers = _relevant_papers(rows, drugs, organs)
+    oa = [p for p in papers if _is_open_access(p)]
+    other = [p for p in papers if not _is_open_access(p)]
+    ordered = oa + other
+    if len(ordered) <= want:
+        return ordered
+    # keep a mix of years: newest half + oldest half of the ordered list
+    half = want // 2
+    return ordered[:half] + ordered[-(want - half):]
+
+
+def _literature_background(rows, researcher_background=""):
     drugs = _drugs(rows)
-    paradigms = _join_unique(_s(g.get("experiment_type")) for g, _, _ in rows)
     organs = _join_unique(_s(g.get("target_organ")) for g, _, _ in rows
                           if _s(g.get("target_organ")).lower() not in ("", "general", "none"))
     overviews = _join_unique(_drug_overview_text(s) for _, _, s in rows if _drug_overview_text(s))
     lead = _list_sentence(drugs) or "the test article(s)"
     is_are = "is" if len(drugs) == 1 else "are"
 
-    # Subject-focused background only (no meta commentary about how the study was
-    # designed or which databases were consulted) — followed by the references.
+    # Subject-focused background. If the researcher supplied their own background
+    # (optional box in the platform) it leads; the platform then adds the
+    # compound context and the references.
     paras = []
+    rb = _s(researcher_background)
+    if rb:
+        paras.append(rb)
     if overviews:
         paras.append(" ".join(overviews[:2]))
     subj = f"{lead} {is_are} of toxicological interest"
@@ -269,7 +296,7 @@ def _literature_background(rows):
              "effects of the compound in a rodent model.")
     paras.append(subj)
 
-    # References — professional, accessible, on-topic only
+    # References — professional, accessible, on-topic; open-access prioritised.
     refs, n = [], 1
     for _, _, s in rows:
         u = _drug_overview_url(s)
@@ -278,7 +305,7 @@ def _literature_background(rows):
                         f"Available at: {u}")
             n += 1
             break
-    for p in _relevant_papers(rows, drugs, organs)[:6]:
+    for p in _select_references(rows, drugs, organs, want=10):
         refs.append(_format_reference(p, n))
         n += 1
 
@@ -306,29 +333,52 @@ def _research_aims(rows):
     return "\n".join(f"{i}. {a}" for i, a in enumerate(aims, 1))
 
 
-def _procedures_overview(rows, acclim_days=""):
-    lines = ["Overview of procedures and manipulations:"]
+def _procedures_overview(rows, acclim_days="", methods=""):
+    """PART 6 overview — a clean, professional list of the manipulations, then
+    the researcher's optional free-text methods, then a representative timeline."""
+    lines = ["The following procedures and manipulations will be performed:"]
     acclim = _s(acclim_days)
-    if acclim:
-        lines.append(f"• Acclimatization period: {acclim} days prior to any procedure.")
+    lines.append(f"1. Acclimatization: animals are allowed to acclimatize to the facility for "
+                 f"{acclim + ' days' if acclim else 'a defined period'} prior to any procedure, "
+                 "with free access to food and water and daily health checks.")
+    n = 2
     for g, _, s in rows:
         if _is_control(g):
             continue
-        drug = _s(g.get("drug_name"), "test article")
-        route = _s(g.get("route"), "assigned route")
+        drug = _s(g.get("drug_name"), "the test article")
+        route = _s(g.get("route"), "the assigned route")
+        route_txt = route if ("route" in route.lower() or "(" in route) else f"the {route} route"
         dose = _s(g.get("dose"))
-        dose_txt = f" ({dose} mg/kg)" if dose else ""
-        lines.append(f"• Administration of {drug}{dose_txt} by {route}.")
+        dose_txt = f" at {dose} mg/kg" if dose else ""
+        lines.append(f"{n}. Dosing ({_s(g.get('group_name'), 'group')}): administration of "
+                     f"{drug}{dose_txt} by {route_txt}.")
+        n += 1
+    lines.append(f"{n}. Monitoring: regular body-weight measurement and structured clinical "
+                 "observation for signs of toxicity against predefined humane endpoints.")
+    n += 1
     samples = _join_unique(x for _, _, s in rows for x in (s.get("recommended_samples") or []))
-    lines.append("• Body-weight measurement and structured clinical observation.")
     if samples:
-        lines.append(f"• Biological sample collection: {_list_sentence(samples)}.")
-    lines.append("• Humane euthanasia and tissue collection at the study endpoint.")
+        lines.append(f"{n}. Sample collection: {_list_sentence(samples)}, collected within safe "
+                     "volume limits at defined time-points.")
+        n += 1
+    lines.append(f"{n}. Termination: humane euthanasia and terminal tissue collection at the "
+                 "study endpoint (see Part 8).")
+
+    # optional researcher-provided methods / procedure detail
+    meth = _s(methods)
+    if meth:
+        lines.append("")
+        lines.append("Additional methods / procedure detail:")
+        lines.append(meth)
+
     # per-group special instructions supplied by the researcher
-    for g, _, _ in rows:
-        ins = _s(g.get("instructions"))
-        if ins:
-            lines.append(f"• Special instructions ({_s(g.get('group_name'), 'Group')}): {ins}")
+    special = [f"• {_s(g.get('group_name'), 'Group')}: {_s(g.get('instructions'))}"
+               for g, _, _ in rows if _s(g.get("instructions"))]
+    if special:
+        lines.append("")
+        lines.append("Special instructions:")
+        lines.extend(special)
+
     # a representative timeline, if available
     tl = None
     for _, _, s in rows:
@@ -492,9 +542,10 @@ def build_context(payload):
         "study_benefit": _study_benefit(rows),
         "strain_health_issues": _strain_health_issues(rows),
         "scientific_justification": _scientific_justification(rows),
-        "literature_background": _literature_background(rows),
+        "literature_background": _literature_background(rows, study.get("background")),
         "research_aims": _research_aims(rows),
-        "procedures_overview": _procedures_overview(rows, admin.get("acclimatization_days")),
+        "procedures_overview": _procedures_overview(rows, admin.get("acclimatization_days"),
+                                                     study.get("methods")),
         "experimental_endpoints": _experimental_endpoints(rows),
         "humane_endpoints": _humane_endpoints(rows),
         "observation_frequency": _observation_frequency(rows),
@@ -572,12 +623,37 @@ def _cell_checkboxes(cell):
 
 
 def _unlock_content_controls(doc):
-    """Remove content-control locks so the researcher can freely edit every
-    answer box after download (the blank form locks ~21 controls)."""
+    """Make the whole document freely editable after download.
+
+    The blank form ships with (a) document-level protection (edit="forms") and
+    (b) locked content controls, and several answer cells are wrapped in
+    cell-level content controls. Together these stop the researcher editing
+    parts of the form (e.g. Part 4 / Part 8). We remove the protection, drop
+    every lock, and unwrap text (non-checkbox) content controls to plain cells."""
+    # 1) remove document-level protection
+    try:
+        st = doc.settings.element
+        dp = st.find(qn('w:documentProtection'))
+        if dp is not None:
+            st.remove(dp)
+    except Exception:
+        pass
+    # 2) drop every content-control lock
     for lock in doc.element.body.findall('.//' + qn('w:lock')):
         parent = lock.getparent()
         if parent is not None:
             parent.remove(lock)
+    # 3) unwrap cell-level text content controls (keep checkbox controls intact)
+    for sdt in list(doc.element.body.iter(qn('w:sdt'))):
+        if sdt.find('.//' + qn('w14:checkbox')) is not None:
+            continue
+        content = sdt.find(qn('w:sdtContent'))
+        if content is None:
+            continue
+        tc = content.find(qn('w:tc'))
+        parent = sdt.getparent()
+        if tc is not None and parent is not None and parent.tag == qn('w:tr'):
+            parent.replace(sdt, tc)
 
 
 def _tick_row_checkbox(table, row_idx, checked=True):

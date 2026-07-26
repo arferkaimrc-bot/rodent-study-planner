@@ -874,6 +874,18 @@
                     <input type="text" id="institution" placeholder="University Research Center">
                 </div>
             </div>
+            <div style="margin-top:14px;">
+                <label for="study-background" style="font-weight:600;">📖 Background / Rationale
+                    <span style="font-weight:400;color:var(--muted);font-size:.85rem;">(optional — for the IACUC literature review)</span></label>
+                <textarea id="study-background" rows="3" placeholder="In your own words, briefly describe the study rationale and background. The platform will expand it and add the compound context and references."
+                    style="width:100%;padding:10px;margin-top:4px;border:1px solid var(--border);border-radius:8px;resize:vertical;"></textarea>
+            </div>
+            <div style="margin-top:12px;">
+                <label for="study-methods" style="font-weight:600;">🔬 Methods / Procedure
+                    <span style="font-weight:400;color:var(--muted);font-size:.85rem;">(optional — added to IACUC Part 6)</span></label>
+                <textarea id="study-methods" rows="3" placeholder="Optional: any specific methods or procedure details you want added to the IACUC Procedures section."
+                    style="width:100%;padding:10px;margin-top:4px;border:1px solid var(--border);border-radius:8px;resize:vertical;"></textarea>
+            </div>
         </div>
 
         <!-- Groups Section -->
@@ -1890,7 +1902,9 @@
                 window.__lastStudy = {
                     study_title: document.getElementById('study-title').value || '',
                     pi_name: document.getElementById('pi-name').value || '',
-                    institution: document.getElementById('institution').value || ''
+                    institution: document.getElementById('institution').value || '',
+                    background: (document.getElementById('study-background')?.value || '').trim(),
+                    methods: (document.getElementById('study-methods')?.value || '').trim()
                 };
 
                 // "Auto-Fill IACUC Form" call-to-action on the results.
@@ -1995,7 +2009,10 @@
                 });
             });
             const payload = {
-                study: window.__lastStudy || {},
+                study: Object.assign({}, window.__lastStudy || {}, {
+                    background: (document.getElementById('study-background')?.value || '').trim(),
+                    methods: (document.getElementById('study-methods')?.value || '').trim()
+                }),
                 groups: window.__lastGroups || [],
                 analysis: window.__lastAnalysis || [],
                 admin: {
