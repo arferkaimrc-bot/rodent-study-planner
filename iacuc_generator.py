@@ -105,24 +105,36 @@ def _drugs(rows):
 
 
 def _format_reference(p, n):
-    """Format one reference like a journal citation, with an accessible link."""
+    """Format one reference in Vancouver style — as it would appear in the
+    reference list of a published biomedical paper:
+        n. Authors. Title. Journal. Year. doi:… / PMID:… / Available from: URL
+    """
     authors = _s(p.get("authors"))
-    year = _s(p.get("year"))
     title = _s(p.get("title"))
+    venue = _s(p.get("venue"))
+    year = _s(p.get("year"))
+    doi = _s(p.get("doi")).replace("https://doi.org/", "").lstrip("/")
+    pmid = _s(p.get("pmid"))
     url = _s(p.get("url"))
-    doi = _s(p.get("doi"))
-    link = url or (f"https://doi.org/{doi}" if doi else "")
-    cite = ""
+
+    parts = []
     if authors:
-        cite += authors + (" et al. " if "," in authors else " ")
+        if authors.count(",") >= 2:          # 3+ names shown ⇒ list is truncated
+            authors += ", et al"
+        parts.append(authors.rstrip(".") + ".")
+    if title:
+        parts.append(title.rstrip(".") + ".")
+    if venue:
+        parts.append(venue.rstrip(".") + ".")
     if year:
-        cite += f"({year}). "
-    cite += title
-    if not cite.rstrip().endswith("."):
-        cite += "."
-    if link:
-        cite += f" Available at: {link}"
-    return f"{n}. {cite}"
+        parts.append(str(year).rstrip(".") + ".")
+    if doi:
+        parts.append(f"doi:{doi}")
+    elif pmid:
+        parts.append(f"PMID:{pmid}")
+    elif url:
+        parts.append(f"Available from: {url}")
+    return f"{n}. " + " ".join(parts)
 
 
 def _study_purpose(rows, study):
@@ -296,13 +308,14 @@ def _literature_background(rows, researcher_background=""):
              "effects of the compound in a rodent model.")
     paras.append(subj)
 
-    # References — professional, accessible, on-topic; open-access prioritised.
+    # References — Vancouver style, on-topic, open-access prioritised.
     refs, n = [], 1
     for _, _, s in rows:
         u = _drug_overview_url(s)
         if u:
-            refs.append(f"{n}. Compound safety summary (authoritative source). "
-                        f"Available at: {u}")
+            cname = (drugs[0] if drugs else "Compound")
+            refs.append(f"{n}. {cname}: chemical and toxicological summary. "
+                        f"Available from: {u}")
             n += 1
             break
     for p in _select_references(rows, drugs, organs, want=10):
