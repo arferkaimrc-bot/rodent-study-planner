@@ -2702,59 +2702,59 @@ def search_pubmed_articles(group, max_results=5):
         logger.error(f"PubMed search failed: {e}")
         return []
 
-def search_europe_pmc(group, max_results=3):
-    """Search Europe PMC for articles."""
-    cache_key = {
-        'drug': group.get("drug_name", ""),
-        'strain': group.get("strain", ""),
-        'target': group.get("target_organ", ""),
-        'max': max_results
-    }
-    
+def search_europe_pmc(group, max_results=12):
+    """Search Europe PMC, prioritising OPEN-ACCESS full-text papers and pulling a
+    mix of recent and older (classic) work so the reference list isn't all new."""
+    drug = group.get("drug_name", "")
+    parts = [drug, group.get("target_organ", ""), "toxicity", "mouse OR mice OR rat"]
+    base_q = " ".join([p for p in parts if p]).strip()
+    if not base_q:
+        return []
+
+    cache_key = {'q': base_q, 'max': max_results}
     cached = api_cache.get('europe_pmc', cache_key)
     if cached:
         return cached
-    
-    parts = [
-        group.get("drug_name", ""),
-        group.get("strain", ""),
-        group.get("target_organ", ""),
-        "mouse OR mice"
+
+    # Two open-access passes: newest first, then most-cited (surfaces older classics)
+    queries = [
+        (f"({base_q}) AND (OPEN_ACCESS:Y)", "P_PDATE_D desc"),
+        (f"({base_q}) AND (OPEN_ACCESS:Y)", "CITED desc"),
     ]
-    query = " ".join([p for p in parts if p]).strip()
-    
-    if not query:
-        return []
-    
+    out, seen = [], set()
     try:
-        url = f"{Config.EUROPE_PMC_BASE}/search"
-        params = {"query": query, "format": "json", "pageSize": max_results}
-        
-        r = requests.get(url, params=params, timeout=Config.REQUEST_TIMEOUT)
-        r.raise_for_status()
-        data = r.json()
-        
-        records = data.get("resultList", {}).get("result", []) or []
-        out = []
-        
-        for rec in records:
-            out.append({
-                "id": rec.get("id"),
-                "source": rec.get("source"),
-                "title": rec.get("title", ""),
-                "journal": rec.get("journalTitle", ""),
-                "year": rec.get("pubYear"),
-                "pmid": rec.get("pmid"),
-                "url": f"https://europepmc.org/article/{rec.get('source','')}/{rec.get('id','')}",
-                "source": "Europe PMC"
-            })
-        
+        for q, sort in queries:
+            params = {"query": q, "format": "json", "pageSize": max_results, "sort": sort}
+            r = requests.get(f"{Config.EUROPE_PMC_BASE}/search", params=params,
+                             timeout=Config.REQUEST_TIMEOUT)
+            r.raise_for_status()
+            for rec in (r.json().get("resultList", {}).get("result", []) or []):
+                title = (rec.get("title") or "").strip()
+                if not title or title.lower() in seen:
+                    continue
+                seen.add(title.lower())
+                pmcid = rec.get("pmcid") or ""
+                if pmcid:                       # direct full-text (open access)
+                    link = f"https://www.ncbi.nlm.nih.gov/pmc/articles/{pmcid}/"
+                else:
+                    link = f"https://europepmc.org/article/{rec.get('source', 'MED')}/{rec.get('id', '')}"
+                out.append({
+                    "title": title,
+                    "authors": rec.get("authorString", ""),
+                    "year": rec.get("pubYear"),
+                    "venue": rec.get("journalTitle", ""),
+                    "pmid": rec.get("pmid", ""),
+                    "doi": rec.get("doi", ""),
+                    "url": link,
+                    "open_access": True,
+                    "citations": rec.get("citedByCount", 0),
+                    "source": "Europe PMC",
+                })
         api_cache.set('europe_pmc', cache_key, out)
         return out
-        
     except Exception as e:
         logger.error(f"Europe PMC search failed: {e}")
-        return []
+        return out
 
 def search_impc(group, max_results=3):
     """Search IMPC for strain phenotype data."""
@@ -2827,11 +2827,11 @@ def build_comprehensive_reference_corpus(group):
     # (not the sum). One slow/failing database no longer stalls the request.
     from concurrent.futures import ThreadPoolExecutor
     _tasks = {
-        'pubmed':   lambda: search_pubmed_articles(group, max_results=5),
-        'europe':   lambda: search_europe_pmc(group, max_results=3),
-        'semantic': lambda: search_semantic_scholar(group, max_results=5),
-        'openalex': lambda: search_openalex(group, max_results=5),
-        'crossref': lambda: search_crossref(group, max_results=3),
+        'pubmed':   lambda: search_pubmed_articles(group, max_results=6),
+        'europe':   lambda: search_europe_pmc(group, max_results=12),
+        'semantic': lambda: search_semantic_scholar(group, max_results=6),
+        'openalex': lambda: search_openalex(group, max_results=6),
+        'crossref': lambda: search_crossref(group, max_results=4),
         'impc':     lambda: search_impc(group, max_results=3),
     }
     _results = {k: [] for k in _tasks}
@@ -2861,22 +2861,43 @@ def build_comprehensive_reference_corpus(group):
                 seen_titles.add(title)
                 all_papers.append(paper)
     
-        # Sort by year (most recent first) and citation count
     def safe_int(val):
         try:
             return int(val)
         except (TypeError, ValueError):
             return 0
 
-    all_papers.sort(
-        key=lambda x: (
-            safe_int(x.get('year')),
-            safe_int(x.get('citations'))
-        ),
-        reverse=True  # عشان الأحدث والأكثر استشهادًا يجي أول
-    )
+    def _is_oa(p):
+        if p.get('open_access'):
+            return True
+        u = (p.get('url') or '').lower()
+        return 'europepmc.org' in u or '/pmc/' in u or 'ncbi.nlm.nih.gov/pmc' in u
 
-    
+    # Build a list that is (a) open-access first and (b) a spread of years — by
+    # interleaving the newest and the oldest OA papers — so the references are
+    # never all-recent and always include freely readable full-text sources.
+    oa = [p for p in all_papers if _is_oa(p)]
+    other = [p for p in all_papers if not _is_oa(p)]
+    oa_new = sorted(oa, key=lambda x: safe_int(x.get('year')), reverse=True)
+    oa_old = sorted(oa, key=lambda x: safe_int(x.get('year')))
+    picked, seen_ids = [], set()
+
+    def _add(p):
+        if id(p) not in seen_ids:
+            seen_ids.add(id(p))
+            picked.append(p)
+
+    i = j = 0
+    while len(picked) < 20 and (i < len(oa_new) or j < len(oa_old)):
+        if i < len(oa_new):
+            _add(oa_new[i]); i += 1
+        if j < len(oa_old):
+            _add(oa_old[j]); j += 1
+    for p in sorted(other, key=lambda x: safe_int(x.get('citations')), reverse=True):
+        if len(picked) >= 20:
+            break
+        _add(p)
+
     return {
         "pubmed": pubmed_refs,
         "europe_pmc": europe_refs,
@@ -2884,7 +2905,7 @@ def build_comprehensive_reference_corpus(group):
         "openalex": openalex_refs,
         "crossref": crossref_refs,
         "impc": impc_refs,
-        "all_papers": all_papers[:20]  # Top 20 papers
+        "all_papers": picked[:20]
     }
 
 # ============================================================================
