@@ -972,14 +972,20 @@
             <button type="button" class="ichip" data-value="Charles River">Charles River</button>
             <button type="button" class="ichip" data-value="Jackson Laboratory">Jackson Lab</button>
             <button type="button" class="ichip" data-value="KAIMRC breeding colony">KAIMRC breeding</button>
+            <button type="button" class="ichip" data-value="__other__">Other</button>
           </div>
+          <input id="iacuc-animal-source-other" type="text" placeholder="Type the animal source (leave blank to fill in the form)"
+            style="display:none;width:100%;padding:8px;margin:0 0 12px;border:1px solid var(--border);border-radius:8px;">
 
           <label class="ilabel">🗓️ Acclimatization period</label>
           <div class="ichip-row" data-field="acclimatization_days">
             <button type="button" class="ichip" data-value="3">3 days</button>
             <button type="button" class="ichip sel" data-value="7">7 days</button>
             <button type="button" class="ichip" data-value="14">14 days</button>
+            <button type="button" class="ichip" data-value="__other__">Other</button>
           </div>
+          <input id="iacuc-acclim-other" type="text" placeholder="Type the acclimatization period (leave blank to fill in the form)"
+            style="display:none;width:100%;padding:8px;margin:0 0 12px;border:1px solid var(--border);border-radius:8px;">
 
           <label class="ilabel">🎓 PI qualifications</label>
           <div class="ichip-row" data-field="pi_qualifications">
@@ -1963,6 +1969,11 @@
             document.getElementById('iacuc-overlay').style.display = 'none';
         };
 
+        // Which "Other" free-text input belongs to which chip row
+        const IACUC_OTHER_INPUT = {
+            animal_source: 'iacuc-animal-source-other',
+            acclimatization_days: 'iacuc-acclim-other'
+        };
         // Single-select chip rows in the IACUC modal (one tap = one choice)
         document.addEventListener('click', function(e) {
             const chip = e.target.closest('.ichip');
@@ -1971,11 +1982,23 @@
             if (!row) return;
             row.querySelectorAll('.ichip').forEach(c => c.classList.remove('sel'));
             chip.classList.add('sel');
+            // toggle the row's "Other" text box
+            const field = row.getAttribute('data-field');
+            const inputId = IACUC_OTHER_INPUT[field];
+            if (inputId) {
+                const inp = document.getElementById(inputId);
+                if (inp) inp.style.display = (chip.getAttribute('data-value') === '__other__') ? 'block' : 'none';
+            }
         });
         function iacucChip(field) {
             const row = document.querySelector('.ichip-row[data-field="' + field + '"]');
             const sel = row && row.querySelector('.ichip.sel');
-            return sel ? sel.getAttribute('data-value') : '';
+            let val = sel ? sel.getAttribute('data-value') : '';
+            if (val === '__other__') {   // use the typed value (may be blank → filled in the form)
+                const inp = document.getElementById(IACUC_OTHER_INPUT[field]);
+                val = inp ? inp.value.trim() : '';
+            }
+            return val;
         }
 
         window.addIacucMember = function() {

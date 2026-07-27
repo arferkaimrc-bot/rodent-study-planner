@@ -271,17 +271,21 @@ def _is_open_access(p):
 
 
 def _select_references(rows, drugs, organs, want=10):
-    """Up to `want` on-topic references — open-access first, then others, with a
-    spread of publication years (a mix of recent and older work)."""
-    papers = _relevant_papers(rows, drugs, organs)
+    """Up to `want` references — the SAME papers shown in the platform's
+    "Citations & Sources" panel, so the form matches the app. Open-access
+    entries are listed first; otherwise order is preserved."""
+    seen, papers = set(), []
+    for _, a, _ in rows:
+        for p in (a.get("reference_papers") or []):
+            if not isinstance(p, dict):
+                continue
+            t = _s(p.get("title")).lower()
+            if t and t not in seen:
+                seen.add(t)
+                papers.append(p)
     oa = [p for p in papers if _is_open_access(p)]
     other = [p for p in papers if not _is_open_access(p)]
-    ordered = oa + other
-    if len(ordered) <= want:
-        return ordered
-    # keep a mix of years: newest half + oldest half of the ordered list
-    half = want // 2
-    return ordered[:half] + ordered[-(want - half):]
+    return (oa + other)[:want]
 
 
 def _literature_background(rows, researcher_background=""):
@@ -516,8 +520,10 @@ def _team(admin, study):
     return team[:6]
 
 
-def _animals(rows, source="Accredited vendor"):
-    source = _s(source, "Accredited vendor")
+def _animals(rows, source=None):
+    # None (field absent) → default vendor; "" (researcher chose "Other" and left
+    # it blank) → leave the Source cell empty for them to fill in the form.
+    source = "Accredited vendor" if source is None else _s(source)
     animals = []
     for g, _, s in rows:
         sp = _s(s.get("species") or g.get("species"), "Mouse")
@@ -801,7 +807,7 @@ def _fill_struct_row(row, values):
     handling sdt-wrapped cells so columns line up."""
     tcs = _ordered_unwrapped_tcs(row._tr)
     for ci, v in enumerate(values):
-        if ci < len(tcs):
+        if v is not None and ci < len(tcs):   # None = leave this cell untouched
             _set_tc_clean(tcs[ci], v)
 
 
@@ -921,6 +927,39 @@ def fill_form_controls(doc, rows, admin, study):
         except Exception:
             pass
 
+    # ── PART 1 B — personnel × procedures matrix (T3) ─────────────────────
+    species_all = _list_sentence(_join_unique(
+        _s(s.get('species') or g.get('species')) for g, _, s in rows)) or 'Mouse'
+    has_blood = any(any(k in _s(x).lower() for k in ('blood', 'plasma', 'serum'))
+                    for g, _, s in rows
+                    for x in (list(g.get('sample_types') or []) + list(s.get('recommended_samples') or [])))
+    # experience per procedure column (c4..c15) for a non-surgical dosing/tox study
+    #   MT, Restraint, Non-invasive, Anaesthesia, Euthanasia, Blood, Surg(S),
+    #   Surg(non-S), Surgical assist, Assess humane EP, Husbandry, Other
+    proc = ['***', '***', '***', '**' if has_blood else 'NE', '**',
+            '**' if has_blood else 'NE', 'NE', 'NE', 'NE', '***', '**', '']
+    for i, m in enumerate(team[:6]):
+        r = 4 + i
+        if r >= len(T[3].rows):
+            break
+        try:
+            _fill_struct_row(T[3].rows[r],
+                             [m['name'], '', m['qualifications'], species_all] + proc)
+        except Exception:
+            pass
+
+    # "Describe any other procedure not listed …" box (T4)
+    _route = _list_sentence(_join_unique(
+        _s(g.get('route')) for g, _, _ in rows if not _is_control(g))) or 'the specified route'
+    try:
+        _write_box(T[4], "The research team is experienced in rodent handling, "
+                         f"{_route} dosing, blood / tissue sample collection and humane-endpoint "
+                         "assessment. All personnel have completed the required Animal User Training "
+                         "and Occupational Health training; certificates are on file. No procedures "
+                         "beyond those listed in the table above are performed by this team.")
+    except Exception:
+        pass
+
     def cb(idx, cell, k=0, checked=True):
         try:
             _check(T[idx].rows[0].cells[cell], k, checked)
@@ -946,8 +985,10 @@ def fill_form_controls(doc, rows, admin, study):
             pass
 
     def row(idx, r, values):
+        # clean fill: clears any content-control placeholder ("Click here to
+        # enter text.") so only the value shows, columns aligned
         try:
-            _fill_row(T[idx], r, values)
+            _fill_struct_row(T[idx].rows[r], values)
         except Exception:
             pass
 
