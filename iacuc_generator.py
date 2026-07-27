@@ -813,40 +813,48 @@ def _fill_struct_row(row, values):
 
 def _write_cell(cell, text):
     """Write text into a cell — into its plain-text content control if it has
-    one, otherwise into the cell's first paragraph."""
+    one (handling both paragraph and inline controls, so the 'Click here to
+    enter text.' placeholder is always replaced), else the first paragraph."""
     for s in cell._element.findall('.//' + qn('w:sdt')):
         if s.find('.//' + qn('w14:checkbox')) is None:
             content = s.find(qn('w:sdtContent'))
-            if content is not None:
-                p = content.find(qn('w:p'))
-                if p is None:
-                    p = content.find('.//' + qn('w:p'))
-                if p is not None:
-                    _set_para_el(p, text)
-                    _left_align(p)
-                    return
+            if content is None:
+                continue
+            p = content.find(qn('w:p'))
+            if p is None:
+                p = content.find('.//' + qn('w:p'))
+            if p is not None:
+                _set_para_el(p, text)
+                _left_align(p)
+                return
+            # inline content control (sdtContent > w:r) — replace its run text
+            runs = content.findall(qn('w:r'))
+            if runs:
+                ts = runs[0].findall(qn('w:t'))
+                if ts:
+                    ts[0].text = text
+                    for x in ts[1:]:
+                        x.text = ''
+                else:
+                    tt = runs[0].makeelement(qn('w:t'), {})
+                    tt.set(qn('xml:space'), 'preserve')
+                    tt.text = text
+                    runs[0].append(tt)
+                for r in runs[1:]:
+                    r.getparent().remove(r)
+                _highlight_run(runs[0])
+                return
     p = cell.paragraphs[0]._p
     _set_para_el(p, text)
     _left_align(p)
 
 
 def _write_box(table, text):
-    """Write text into a 1×1 answer-box table whose cell may be wrapped in a
-    content control (python-docx `.cells` can't reach those)."""
+    """Fill a 1×1 answer-box table. Clears the whole cell first — including any
+    content control and its 'Click here to enter text.' placeholder — then
+    writes clean, highlighted, left-aligned text."""
     tc = next(table._tbl.iter(qn('w:tc')))
-    for s in tc.findall('.//' + qn('w:sdt')):
-        if s.find('.//' + qn('w14:checkbox')) is None:
-            content = s.find(qn('w:sdtContent'))
-            if content is not None:
-                p = content.find('.//' + qn('w:p'))
-                if p is not None:
-                    _set_para_el(p, text)
-                    _left_align(p)
-                    return
-    p = tc.find('.//' + qn('w:p'))
-    if p is not None:
-        _set_para_el(p, text)
-        _left_align(p)
+    _set_tc_clean(tc, text)
 
 
 def _write_explain(table, text):
@@ -952,11 +960,10 @@ def fill_form_controls(doc, rows, admin, study):
     _route = _list_sentence(_join_unique(
         _s(g.get('route')) for g, _, _ in rows if not _is_control(g))) or 'the specified route'
     try:
-        _write_box(T[4], "The research team is experienced in rodent handling, "
-                         f"{_route} dosing, blood / tissue sample collection and humane-endpoint "
-                         "assessment. All personnel have completed the required Animal User Training "
-                         "and Occupational Health training; certificates are on file. No procedures "
-                         "beyond those listed in the table above are performed by this team.")
+        _write_box(T[4], "The research team will perform rodent handling and restraint, "
+                         f"{_route} dosing, blood / tissue sample collection, clinical monitoring "
+                         "and humane-endpoint assessment for this study. No procedures beyond those "
+                         "listed in the table above are undertaken by this team.")
     except Exception:
         pass
 
