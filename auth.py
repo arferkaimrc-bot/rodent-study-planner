@@ -395,6 +395,14 @@ def init_auth(app):
         db_url = db_url.replace('postgres://', 'postgresql://', 1)
     app.config['SQLALCHEMY_DATABASE_URI'] = db_url
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+    # Neon (and other serverless Postgres) auto-suspend when idle and drop the
+    # TCP connection; without this, the next request reuses a dead pooled
+    # connection and returns 500. pool_pre_ping revives it transparently.
+    if db_url.startswith('postgresql'):
+        app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+            'pool_pre_ping': True,   # check the connection is alive before each use
+            'pool_recycle': 280,     # recycle connections before Neon's idle timeout
+        }
 
     db.init_app(app)
     login_manager.init_app(app)
