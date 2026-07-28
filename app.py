@@ -104,6 +104,7 @@ class Config:
     SEMANTIC_SCHOLAR_BASE = "https://api.semanticscholar.org/graph/v1"
     OPENALEX_BASE = "https://api.openalex.org"
     CROSSREF_BASE = "https://api.crossref.org/works"
+    DOAJ_BASE = "https://doaj.org/api/v2/search/articles"   # open-access journals
     
     # ChEMBL API for bioactivity data
     CHEMBL_BASE = "https://www.ebi.ac.uk/chembl/api/data"
@@ -2756,6 +2757,94 @@ def search_europe_pmc(group, max_results=12):
         logger.error(f"Europe PMC search failed: {e}")
         return out
 
+
+def search_doaj(group, max_results=6):
+    """Search DOAJ (Directory of Open Access Journals) — fully open-access,
+    peer-reviewed journal articles."""
+    parts = [group.get("drug_name", ""), group.get("target_organ", ""), "toxicity"]
+    q = " ".join([p for p in parts if p]).strip()
+    if not q:
+        return []
+    cache_key = {'q': q, 'max': max_results}
+    cached = api_cache.get('doaj', cache_key)
+    if cached:
+        return cached
+    try:
+        from urllib.parse import quote
+        url = f"{Config.DOAJ_BASE}/{quote(q)}"
+        r = requests.get(url, params={"pageSize": max_results, "sort": "created_date:desc"},
+                         timeout=Config.REQUEST_TIMEOUT)
+        r.raise_for_status()
+        out = []
+        for res in (r.json().get("results", []) or []):
+            b = res.get("bibjson", {}) or {}
+            doi = ""
+            link = ""
+            for idf in b.get("identifier", []) or []:
+                if idf.get("type") == "doi":
+                    doi = idf.get("id", "")
+            for lk in b.get("link", []) or []:
+                if lk.get("url"):
+                    link = lk["url"]
+                    break
+            authors = ", ".join(a.get("name", "") for a in (b.get("author", []) or [])[:6])
+            out.append({
+                "title": b.get("title", ""),
+                "authors": authors,
+                "year": b.get("year"),
+                "venue": (b.get("journal", {}) or {}).get("title", ""),
+                "doi": doi,
+                "url": link or (f"https://doi.org/{doi}" if doi else ""),
+                "open_access": True,
+                "source": "DOAJ",
+            })
+        api_cache.set('doaj', cache_key, out)
+        return out
+    except Exception as e:
+        logger.error(f"DOAJ search failed: {e}")
+        return []
+
+
+def search_preprints(group, max_results=6):
+    """Search bioRxiv / medRxiv preprints (indexed and served via Europe PMC)."""
+    parts = [group.get("drug_name", ""), group.get("target_organ", ""), "toxicity",
+             "mouse OR mice OR rat"]
+    base_q = " ".join([p for p in parts if p]).strip()
+    if not base_q:
+        return []
+    cache_key = {'q': base_q, 'max': max_results}
+    cached = api_cache.get('preprints', cache_key)
+    if cached:
+        return cached
+    try:
+        q = f'({base_q}) AND (SRC:"PPR")'   # PPR = preprint sources (bioRxiv/medRxiv…)
+        r = requests.get(f"{Config.EUROPE_PMC_BASE}/search",
+                         params={"query": q, "format": "json", "pageSize": max_results,
+                                 "sort": "P_PDATE_D desc"},
+                         timeout=Config.REQUEST_TIMEOUT)
+        r.raise_for_status()
+        out = []
+        for rec in (r.json().get("resultList", {}).get("result", []) or []):
+            title = (rec.get("title") or "").strip()
+            if not title:
+                continue
+            out.append({
+                "title": title,
+                "authors": rec.get("authorString", ""),
+                "year": rec.get("pubYear"),
+                "venue": rec.get("bookOrReportDetails", {}).get("publisher", "") or "Preprint (bioRxiv/medRxiv)",
+                "doi": rec.get("doi", ""),
+                "url": f"https://europepmc.org/article/{rec.get('source', 'PPR')}/{rec.get('id', '')}",
+                "open_access": True,
+                "source": "Preprint (bioRxiv/medRxiv)",
+            })
+        api_cache.set('preprints', cache_key, out)
+        return out
+    except Exception as e:
+        logger.error(f"Preprint search failed: {e}")
+        return []
+
+
 def search_impc(group, max_results=3):
     """Search IMPC for strain phenotype data."""
     strain = group.get('strain', '').replace('/', '%2F')
@@ -2832,29 +2921,38 @@ def build_comprehensive_reference_corpus(group):
         'semantic': lambda: search_semantic_scholar(group, max_results=6),
         'openalex': lambda: search_openalex(group, max_results=6),
         'crossref': lambda: search_crossref(group, max_results=4),
+        'doaj':     lambda: search_doaj(group, max_results=6),
+        'preprint': lambda: search_preprints(group, max_results=6),
         'impc':     lambda: search_impc(group, max_results=3),
     }
     _results = {k: [] for k in _tasks}
-    with ThreadPoolExecutor(max_workers=4) as _ex:
-        _futs = {_ex.submit(fn): name for name, fn in _tasks.items()}
-        for _fut, _name in _futs.items():
-            try:
-                _results[_name] = _fut.result(timeout=12) or []
-            except Exception as e:
-                logger.warning(f"{_name} search failed/timeout: {e}")
-                _results[_name] = []
+    # Start every source at once; cap each result-wait; and DON'T block the
+    # request waiting for a slow/hung source (e.g. a rate-limited retry) to
+    # finish — shutdown(wait=False) lets stragglers die in the background.
+    _ex = ThreadPoolExecutor(max_workers=len(_tasks))
+    _futs = {_ex.submit(fn): name for name, fn in _tasks.items()}
+    for _fut, _name in _futs.items():
+        try:
+            _results[_name] = _fut.result(timeout=12) or []
+        except Exception as e:
+            logger.warning(f"{_name} search failed/timeout: {e}")
+            _results[_name] = []
+    _ex.shutdown(wait=False)
     pubmed_refs = _results['pubmed']
     europe_refs = _results['europe']
     semantic_refs = _results['semantic']
     openalex_refs = _results['openalex']
     crossref_refs = _results['crossref']
+    doaj_refs = _results['doaj']
+    preprint_refs = _results['preprint']
     impc_refs = _results['impc']
-    
-    # Combine and deduplicate by title
+
+    # Combine and deduplicate by title (open-access sources included)
     all_papers = []
     seen_titles = set()
-    
-    for paper_list in [pubmed_refs, europe_refs, semantic_refs, openalex_refs, crossref_refs]:
+
+    for paper_list in [europe_refs, doaj_refs, pubmed_refs, semantic_refs,
+                       openalex_refs, crossref_refs, preprint_refs]:
         for paper in paper_list:
             title = paper.get('title', '').lower().strip()
             if title and title not in seen_titles:
@@ -2887,6 +2985,15 @@ def build_comprehensive_reference_corpus(group):
             seen_ids.add(id(p))
             picked.append(p)
 
+    # Guarantee visibility for the newer open sources (DOAJ journals + preprints)
+    # so the reference list isn't only Europe PMC.
+    for _src in (doaj_refs, preprint_refs):
+        _added = 0
+        for p in _src:
+            if _added >= 3:
+                break
+            _add(p); _added += 1
+
     i = j = 0
     while len(picked) < 20 and (i < len(oa_new) or j < len(oa_old)):
         if i < len(oa_new):
@@ -2904,6 +3011,8 @@ def build_comprehensive_reference_corpus(group):
         "semantic_scholar": semantic_refs,
         "openalex": openalex_refs,
         "crossref": crossref_refs,
+        "doaj": doaj_refs,
+        "preprint": preprint_refs,
         "impc": impc_refs,
         "all_papers": picked[:20]
     }
@@ -3312,13 +3421,17 @@ def get_prediction_and_suggestion(group, all_groups_count=1):
             "ml_prediction": None,
             "all_sources": {
                 "pubmed_count": len(ref_corpus.get("pubmed", [])),
+                "europe_pmc_count": len(ref_corpus.get("europe_pmc", [])),
                 "semantic_scholar_count": len(ref_corpus.get("semantic_scholar", [])),
                 "openalex_count": len(ref_corpus.get("openalex", [])),
                 "crossref_count": len(ref_corpus.get("crossref", [])),
+                "doaj_count": len(ref_corpus.get("doaj", [])),
+                "preprint_count": len(ref_corpus.get("preprint", [])),
+                "impc_count": len(ref_corpus.get("impc", [])),
                 "total_papers": len(ref_corpus.get("all_papers", []))
             }
         }
-    
+
     # Use ML model for prediction if available
     ml_prediction = None
     if ml_model:
@@ -3602,6 +3715,8 @@ def get_prediction_and_suggestion(group, all_groups_count=1):
             "semantic_scholar_count": len(ref_corpus.get("semantic_scholar", [])),
             "openalex_count": len(ref_corpus.get("openalex", [])),
             "crossref_count": len(ref_corpus.get("crossref", [])),
+            "doaj_count": len(ref_corpus.get("doaj", [])),
+            "preprint_count": len(ref_corpus.get("preprint", [])),
             "impc_count": len(ref_corpus.get("impc", [])),
             "total_papers": len(all_papers_list)
         },

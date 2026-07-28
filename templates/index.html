@@ -1849,10 +1849,12 @@
                         const src = result.all_sources || {};
                         const dbList = [
                             ['PubMed (NIH/NLM)', src.pubmed_count, 'https://pubmed.ncbi.nlm.nih.gov/'],
-                            ['Semantic Scholar', src.semantic_scholar_count, 'https://www.semanticscholar.org/'],
                             ['Europe PMC', src.europe_pmc_count, 'https://europepmc.org/'],
                             ['OpenAlex', src.openalex_count, 'https://openalex.org/'],
                             ['CrossRef', src.crossref_count, 'https://www.crossref.org/'],
+                            ['Semantic Scholar', src.semantic_scholar_count, 'https://www.semanticscholar.org/'],
+                            ['DOAJ (Open Access)', src.doaj_count, 'https://doaj.org/'],
+                            ['Preprints (bioRxiv/medRxiv)', src.preprint_count, 'https://www.biorxiv.org/'],
                             ['IMPC (Mouse Phenotypes)', src.impc_count, 'https://www.mousephenotype.org/']
                         ];
                         resultHtml += sectionHtml('📚 Citations &amp; Sources', `
@@ -1865,7 +1867,7 @@
                             ${(result.reference_papers && result.reference_papers.length) ? `
                                 <div style="font-size:0.82rem;font-weight:700;margin-bottom:6px;">🔗 Related papers (click to open):</div>
                                 <ul style="margin:0;padding-left:18px;font-size:0.86rem;">
-                                    ${result.reference_papers.slice(0, 6).map(p => `
+                                    ${result.reference_papers.slice(0, 15).map(p => `
                                         <li style="margin-bottom:9px;">
                                             <a href="${p.url || p.pubmed_url || '#'}" target="_blank" style="color:var(--info);font-weight:600;">${p.title || 'Untitled'}</a>
                                             <span style="color:var(--muted);font-size:0.8rem;"> — ${p.journal || p.venue || ''} ${p.year ? '(' + p.year + ')' : ''} ${p.citations ? '• ' + p.citations + ' citations' : ''} • <strong>${p.source || ''}</strong></span>
