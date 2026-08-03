@@ -952,7 +952,7 @@
 
         <!-- Controls -->
         <div style="display: flex; gap: 12px; flex-wrap: wrap; margin: 24px 0;">
-            <button id="add-group-btn">➕ Add Treatment Group</button>
+            <button id="add-group-btn">➕ Add Group</button>
             <button id="save-draft-btn" style="background: linear-gradient(180deg, #f59e0b, #d97706);">💾 Save Draft</button>
             <button id="resume-draft-btn" style="background: linear-gradient(180deg, #64748b, #475569);">📂 Resume Draft</button>
             <button id="study-plan-pdf-btn" style="background: linear-gradient(180deg, #3b82f6, #2563eb);">📄 Export PDF</button>
@@ -1218,7 +1218,7 @@
         function addGroup(isControl = false, data = null) {
             groupCount++;
 
-            const groupName = data?.group_name || (isControl ? 'Control Group' : `Treatment Group ${groupCount}`);
+            const groupName = data?.group_name || (isControl ? `Group ${groupCount} (Control)` : `Group ${groupCount}`);
             const drugName = data?.drug_name || (isControl ? 'Saline' : '');
             const groupId = `group-${groupCount}`;
 
