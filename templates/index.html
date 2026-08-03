@@ -1247,6 +1247,19 @@
                                    value="${(data?.experiment_type && !['Oncology','Immunology','Neuroscience','Metabolic','Cardiovascular','Toxicology','Custom'].includes(data.experiment_type)) ? data.experiment_type : ''}">
                         </div>
 
+                        <div class="form-group" style="grid-column: 1 / -1;">
+                            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;">
+                                <div class="form-group">
+                                    <label>Disease Model &amp; Justification (Optional):</label>
+                                    <textarea class="disease-model" rows="3" placeholder="e.g., STZ diabetes, HFD obesity, and justification for this model…" style="resize:vertical;">${data?.disease_model || ''}</textarea>
+                                </div>
+                                <div class="form-group">
+                                    <label>Success &amp; Failure Criteria (Optional):</label>
+                                    <textarea class="success-criteria" rows="3" placeholder="Describe the criteria for the expected phenotype…" style="resize:vertical;">${data?.success_criteria || ''}</textarea>
+                                </div>
+                            </div>
+                        </div>
+
                         <div class="form-group">
                             <label>Group Name:</label>
                             <input type="text" class="group-name" value="${groupName}">
