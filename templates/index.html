@@ -1314,6 +1314,29 @@
                             </div>
                         </div>
 
+                        <div class="form-group" style="grid-column: 1 / -1;">
+                            <label>🩺 Welfare Monitoring (Humane Endpoints):</label>
+                            <div class="tox-endpoints-grid">
+                                ${(() => {
+                                    const wparams = ['Weight loss','Grooming','Mobility','Food intake','Ulceration','Hydration','Pain score','Fur appearance'];
+                                    const wsel = data?.welfare_monitoring || [];
+                                    return wparams.map(p => `
+                                        <label class="tox-endpoint">
+                                            <input type="checkbox" class="welfare-cb" value="${p}" ${wsel.includes(p) ? 'checked' : ''}>
+                                            <span>${p}</span>
+                                        </label>`).join('');
+                                })()}
+                                <label class="tox-endpoint">
+                                    <input type="checkbox" class="welfare-other-cb" ${data?.welfare_other ? 'checked' : ''}
+                                           onchange="this.closest('.form-group').querySelector('.welfare-other-input').style.display=this.checked?'block':'none'">
+                                    <span>Other</span>
+                                </label>
+                            </div>
+                            <input type="text" class="welfare-other-input" placeholder="Specify other welfare parameter…"
+                                   value="${data?.welfare_other || ''}"
+                                   style="margin-top:8px; display:${data?.welfare_other ? 'block' : 'none'};">
+                        </div>
+
                         <div class="form-group">
                             <label>Species:</label>
                             <input type="hidden" class="species" value="${data?.species || 'Mouse'}">
