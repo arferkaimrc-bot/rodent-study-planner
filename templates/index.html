@@ -1652,7 +1652,13 @@
                     instructions: groupEl.querySelector('.instructions').value,
                     sample_types: getSelectedSampleTypes(groupEl),
                     blood_timepoints: groupEl.querySelector('.blood-timepoints')?.value || 1,
-                    blood_replicates: groupEl.querySelector('.blood-replicates')?.value || 1
+                    blood_replicates: groupEl.querySelector('.blood-replicates')?.value || 1,
+                    vendor: (groupEl.querySelector('.vendor')?.value || '').trim(),
+                    genetic_background: (groupEl.querySelector('.genetic-background')?.value || '').trim(),
+                    transgenic_line: (groupEl.querySelector('.transgenic-line')?.value || '').trim(),
+                    housing_temp: (groupEl.querySelector('.housing-temp')?.value || '').trim(),
+                    housing_humidity: (groupEl.querySelector('.housing-humidity')?.value || '').trim(),
+                    housing_light: (groupEl.querySelector('.housing-light')?.value || '').trim()
                 });
             });
             

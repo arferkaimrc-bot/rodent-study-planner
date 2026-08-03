@@ -210,12 +210,21 @@ def _study_benefit(rows):
 
 def _strain_health_issues(rows):
     strains = _join_unique(_s(s.get("strain") or g.get("strain")) for g, _, s in rows)
+    # Genetic background / transgenic lines the researcher entered per group.
+    genetics = _join_unique(
+        " — ".join(x for x in [_s(g.get("genetic_background")), _s(g.get("transgenic_line"))] if x)
+        for g, _, _ in rows)
+    genetics = [x for x in genetics if x]
+    extra = ""
+    if genetics:
+        extra = f" Genetic background / transgenic line(s): {_list_sentence(genetics)}."
     if not strains:
         return ("No strain-specific health or husbandry issues are anticipated. Standard "
-                "outbred/inbred laboratory rodents will be used and monitored per facility SOPs.")
+                "outbred/inbred laboratory rodents will be used and monitored per facility SOPs."
+                + extra)
     return (f"Animals of the following strain(s) will be used: {_list_sentence(strains)}. "
             "No unusual strain-specific health or husbandry concerns are anticipated; animals "
-            "will be sourced from accredited vendors and monitored per facility SOPs.")
+            "will be sourced from accredited vendors and monitored per facility SOPs." + extra)
 
 
 def _scientific_justification(rows):
@@ -537,12 +546,19 @@ def _animals(rows, source=None):
     for g, _, s in rows:
         sp = _s(s.get("species") or g.get("species"), "Mouse")
         strain = _s(s.get("strain") or g.get("strain") or s.get("recommended_strain"))
+        # transgenic line → strain marked with "*" (the form asks to indicate
+        # genetically-modified strains with *) and the line noted in parentheses
+        tg = _s(g.get("transgenic_line"))
+        if tg:
+            strain = (strain + " " if strain else "") + f"* ({tg})"
         sex = _s(g.get("sex"), "—")
         age = _s(s.get("planned_age_weeks") or g.get("age"))
         age = f"{age} wk" if age and "wk" not in age.lower() and "week" not in age.lower() else (age or "—")
         total = _s(s.get("planned_animals") or g.get("num_mice"), "—")
+        # per-group Vendor overrides the study-wide source when provided
+        src = _s(g.get("vendor")) or source
         animals.append({"species": sp, "strain": strain or "—", "sex": sex,
-                        "age": age, "total": total, "source": source})
+                        "age": age, "total": total, "source": src})
     return animals[:6]
 
 
@@ -1126,6 +1142,21 @@ def fill_form_controls(doc, rows, admin, study):
     cbr(27, 1, 0, 0)                             # standard housing: YES
     cbr(27, 1, 1, 0)                             # arrangement: GROUP
     cbr(27, 1, 2, 2 if absl else 0)              # ABSL if requested, else CONVENTIONAL
+    # special environmental conditions (T27 explain box), from the group cards
+    _hz = []
+    for g, _, _ in rows:
+        t, h, l = _s(g.get('housing_temp')), _s(g.get('housing_humidity')), _s(g.get('housing_light'))
+        bits = [f"temperature {t}" if t else "", f"humidity {h}" if h else "",
+                f"light cycle {l}" if l else ""]
+        bits = [b for b in bits if b]
+        if bits:
+            _hz.append("; ".join(bits))
+    if _hz:
+        try:
+            _write_cell(T[27].rows[3].cells[0],
+                        "Environmental conditions: " + " | ".join(dict.fromkeys(_hz)) + ".")
+        except Exception:
+            pass
     cb(28, 0)                                    # housing discussed with vet? YES
     explain(28, "Attending facility veterinarian, KAIMRC.")
     cb(29, 0)                                    # standard diet? YES
