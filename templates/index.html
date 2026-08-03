@@ -1305,6 +1305,39 @@
                         </div>
 
                         <div class="form-group">
+                            <label>Vendor (if any):</label>
+                            <input type="text" class="vendor" placeholder="e.g., Charles River" value="${data?.vendor || ''}">
+                        </div>
+
+                        <div class="form-group">
+                            <label>Genetic Background:</label>
+                            <input type="text" class="genetic-background" placeholder="e.g., C57BL/6J" value="${data?.genetic_background || ''}">
+                        </div>
+
+                        <div class="form-group">
+                            <label>Transgenic Line:</label>
+                            <input type="text" class="transgenic-line" placeholder="e.g., APP/PS1 (if applicable)" value="${data?.transgenic_line || ''}">
+                        </div>
+
+                        <div class="form-group" style="grid-column: 1 / -1;">
+                            <label>🏠 Housing Conditions (Special Settings):</label>
+                            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;padding:14px;border:1px solid var(--border);border-radius:10px;background:rgba(0,0,0,.02);">
+                                <div class="form-group">
+                                    <label>Temperature</label>
+                                    <input type="text" class="housing-temp" placeholder="e.g., 22°C" value="${data?.housing_temp || ''}">
+                                </div>
+                                <div class="form-group">
+                                    <label>Humidity</label>
+                                    <input type="text" class="housing-humidity" placeholder="e.g., 50%" value="${data?.housing_humidity || ''}">
+                                </div>
+                                <div class="form-group">
+                                    <label>Light Cycle</label>
+                                    <input type="text" class="housing-light" placeholder="e.g., 12h/12h" value="${data?.housing_light || ''}">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
                             <label>Route:</label>
                             <input type="hidden" class="route" value="${data?.route || 'Oral'}">
                             <div class="tile-group" data-target=".route">
