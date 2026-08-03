@@ -1307,16 +1307,19 @@
                         <div class="form-group">
                             <label>Vendor (if any):</label>
                             <input type="text" class="vendor" placeholder="e.g., Charles River" value="${data?.vendor || ''}">
+                            ${suggChips('.vendor')}
                         </div>
 
                         <div class="form-group">
                             <label>Genetic Background:</label>
                             <input type="text" class="genetic-background" placeholder="e.g., C57BL/6J" value="${data?.genetic_background || ''}">
+                            ${suggChips('.genetic-background')}
                         </div>
 
                         <div class="form-group">
                             <label>Transgenic Line:</label>
                             <input type="text" class="transgenic-line" placeholder="e.g., APP/PS1 (if applicable)" value="${data?.transgenic_line || ''}">
+                            ${suggChips('.transgenic-line')}
                         </div>
 
                         <div class="form-group" style="grid-column: 1 / -1;">
@@ -1325,14 +1328,17 @@
                                 <div class="form-group">
                                     <label>Temperature</label>
                                     <input type="text" class="housing-temp" placeholder="e.g., 22°C" value="${data?.housing_temp || ''}">
+                                    ${suggChips('.housing-temp')}
                                 </div>
                                 <div class="form-group">
                                     <label>Humidity</label>
                                     <input type="text" class="housing-humidity" placeholder="e.g., 50%" value="${data?.housing_humidity || ''}">
+                                    ${suggChips('.housing-humidity')}
                                 </div>
                                 <div class="form-group">
                                     <label>Light Cycle</label>
                                     <input type="text" class="housing-light" placeholder="e.g., 12h/12h" value="${data?.housing_light || ''}">
+                                    ${suggChips('.housing-light')}
                                 </div>
                             </div>
                         </div>
@@ -1467,6 +1473,31 @@
                 });
             });
         }
+
+        // Static click-to-fill suggestions for the animal / housing fields
+        const FIELD_SUGGESTIONS = {
+            'vendor': ['Charles River', 'Jackson Laboratory', 'Envigo', 'Taconic', 'KAIMRC breeding'],
+            'genetic-background': ['C57BL/6J', 'C57BL/6N', 'BALB/c', '129/Sv', 'FVB/N'],
+            'transgenic-line': ['None', 'APP/PS1', 'Cre-lox', 'ob/ob', 'db/db', 'Nude (Foxn1nu)'],
+            'housing-temp': ['20°C', '22°C', '24°C'],
+            'housing-humidity': ['40%', '50%', '55%', '60%'],
+            'housing-light': ['12h/12h', '14h/10h', '10h/14h']
+        };
+        function suggChips(targetSelector) {
+            const list = FIELD_SUGGESTIONS[targetSelector.replace('.', '')] || [];
+            if (!list.length) return '';
+            return '<div class="drug-suggestions" style="margin-top:6px;display:flex;flex-wrap:wrap;gap:5px;">'
+                + list.map(v => `<button type="button" class="drug-chip sugg-chip" data-target="${targetSelector}" data-val="${v}">${v}</button>`).join('')
+                + '</div>';
+        }
+        // Delegated: clicking a suggestion fills its field within the same group card
+        document.addEventListener('click', function(e) {
+            const chip = e.target.closest('.sugg-chip');
+            if (!chip) return;
+            const group = chip.closest('.group-container');
+            const field = group && group.querySelector(chip.dataset.target);
+            if (field) field.value = chip.dataset.val;
+        });
 
         function toggleParadigmCustom(groupEl) {
             const paradigm = groupEl.querySelector('.experiment-type')?.value;
