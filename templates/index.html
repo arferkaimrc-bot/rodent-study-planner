@@ -930,17 +930,17 @@
         <!-- Experimental Design -->
         <div class="meta-section">
             <h2>🧬 Experimental Design</h2>
-            <div class="meta-row">
-                <div class="form-group">
-                    <label for="study-design-type">Study Design Type</label>
-                    <select id="study-design-type">
-                        <option value="Standard / Parallel">Standard / Parallel</option>
-                        <option value="Cross-over">Cross-over</option>
-                        <option value="Longitudinal">Longitudinal</option>
-                        <option value="Cage randomized">Cage randomized</option>
-                        <option value="Other">Other</option>
-                    </select>
+            <div class="form-group">
+                <label>Study Design Type</label>
+                <div class="ichip-row" data-field="study_design" style="margin-top:4px;">
+                    <button type="button" class="ichip sel" data-value="Standard / Parallel">Standard / Parallel</button>
+                    <button type="button" class="ichip" data-value="Cross-over">Cross-over</button>
+                    <button type="button" class="ichip" data-value="Longitudinal">Longitudinal</button>
+                    <button type="button" class="ichip" data-value="Cage randomized">Cage randomized</button>
+                    <button type="button" class="ichip" data-value="__other__">Other</button>
                 </div>
+                <input id="study-design-other" type="text" placeholder="Enter the study design type"
+                    style="display:none;width:100%;padding:12px 14px;margin-top:6px;border:1.5px solid var(--border);border-radius:10px;">
             </div>
         </div>
 
@@ -2058,7 +2058,8 @@
         const IACUC_OTHER_INPUT = {
             animal_source: 'iacuc-animal-source-other',
             acclimatization_days: 'iacuc-acclim-other',
-            study_duration: 'study-duration-custom'
+            study_duration: 'study-duration-custom',
+            study_design: 'study-design-other'
         };
         // Single-select chip rows in the IACUC modal (one tap = one choice)
         document.addEventListener('click', function(e) {
@@ -2102,7 +2103,7 @@
                 outcomes: v('study-outcomes'),
                 methods: v('study-methods'),
                 duration: iacucChip('study_duration'),
-                design: v('study-design-type'),
+                design: iacucChip('study_design'),
                 refine: {
                     background: chk('refine-background'),
                     hypothesis: chk('refine-hypothesis'),
