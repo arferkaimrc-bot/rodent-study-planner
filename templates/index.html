@@ -1168,6 +1168,19 @@
 
             sampleTypesDiv.innerHTML = '';
 
+            // Free-text box revealed only when the "Other" sample type is checked.
+            const stContainer = container.querySelector('.sample-types-container');
+            let otherInput = stContainer ? stContainer.querySelector('.sample-other-input') : null;
+            if (stContainer && !otherInput) {
+                otherInput = document.createElement('input');
+                otherInput.type = 'text';
+                otherInput.className = 'sample-other-input';
+                otherInput.placeholder = 'Specify other sample type…';
+                otherInput.style.marginTop = '8px';
+                otherInput.style.display = 'none';
+                stContainer.appendChild(otherInput);
+            }
+
             SAMPLE_TYPES.forEach(type => {
                 const label = document.createElement('label');
                 label.className = 'sample-checkbox';
@@ -1176,10 +1189,15 @@
                 checkbox.type = 'checkbox';
                 checkbox.value = type;
                 checkbox.checked = selectedTypes.includes(type);
-                
+
                 // Listen for changes to show/hide blood quantity
                 checkbox.addEventListener('change', () => {
                     updateBloodQuantitySection(container);
+                    // Reveal the free-text box when "Other" is selected.
+                    if (type === 'Other' && otherInput) {
+                        otherInput.style.display = checkbox.checked ? 'block' : 'none';
+                        if (checkbox.checked) otherInput.focus();
+                    }
                 });
 
                 const span = document.createElement('span');
@@ -1188,6 +1206,11 @@
                 label.appendChild(checkbox);
                 label.appendChild(span);
                 sampleTypesDiv.appendChild(label);
+
+                // Keep the "Other" box in sync on (re)render (e.g. resumed draft).
+                if (type === 'Other' && otherInput) {
+                    otherInput.style.display = checkbox.checked ? 'block' : 'none';
+                }
             });
             
             console.log(`✅ Created ${SAMPLE_TYPES.length} sample type checkboxes`);
@@ -1195,7 +1218,11 @@
 
         function getSelectedSampleTypes(container) {
             const checkboxes = container.querySelectorAll('.sample-types-grid input[type="checkbox"]:checked');
-            return Array.from(checkboxes).map(cb => cb.value);
+            const otherInput = container.querySelector('.sample-other-input');
+            const otherText = otherInput ? otherInput.value.trim() : '';
+            return Array.from(checkboxes).map(cb =>
+                (cb.value === 'Other' && otherText) ? otherText : cb.value
+            );
         }
 
         function updateBloodQuantitySection(container) {
