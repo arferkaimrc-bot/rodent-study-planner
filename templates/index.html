@@ -1262,7 +1262,45 @@
                             <label>Dose (mg/kg):</label>
                             <input type="number" class="dose" value="${data?.dose ?? (isControl ? '0' : '')}" min="0" step="0.1">
                         </div>
-                        
+
+                        <div class="form-group">
+                            <label>Vehicle (e.g., Saline):</label>
+                            <input type="text" class="vehicle" placeholder="e.g., Saline, PBS, DMSO" value="${data?.vehicle || ''}">
+                        </div>
+
+                        <div class="form-group">
+                            <label>Vehicle Volume:</label>
+                            <input type="text" class="vehicle-volume" placeholder="e.g., 10 mL/kg" value="${data?.vehicle_volume || ''}">
+                        </div>
+
+                        <div class="form-group">
+                            <label>Frequency of Treatment:</label>
+                            <input type="text" class="frequency" placeholder="e.g., once daily" value="${data?.frequency || ''}">
+                        </div>
+
+                        <div class="form-group">
+                            <label>Treatment Duration:</label>
+                            <input type="text" class="treatment-duration" placeholder="e.g., 14 days" value="${data?.treatment_duration || ''}">
+                        </div>
+
+                        <div class="form-group">
+                            <label>Time of Dosing:</label>
+                            <input type="text" class="time-of-dosing" placeholder="e.g., 09:00 AM" value="${data?.time_of_dosing || ''}">
+                        </div>
+
+                        <div class="form-group" style="grid-column: 1 / -1;">
+                            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;">
+                                <div class="form-group">
+                                    <label>Drug Preparation Information:</label>
+                                    <textarea class="drug-preparation" rows="2" placeholder="e.g., dissolved in saline; prepared fresh on the day of dosing" style="resize:vertical;">${data?.drug_preparation || ''}</textarea>
+                                </div>
+                                <div class="form-group">
+                                    <label>Drug Storage &amp; Stability:</label>
+                                    <textarea class="drug-storage" rows="2" placeholder="e.g., stored at 4°C, protected from light; stable for 7 days" style="resize:vertical;">${data?.drug_storage || ''}</textarea>
+                                </div>
+                            </div>
+                        </div>
+
                         <div class="form-group">
                             <label>Species:</label>
                             <input type="hidden" class="species" value="${data?.species || 'Mouse'}">
@@ -1464,12 +1502,19 @@
             const box = groupEl.querySelector('.drug-suggestions');
             if (!box) return;
             const list = DRUG_SUGGESTIONS[paradigm] || [];
-            if (!list.length) { box.innerHTML = ''; return; }
             box.innerHTML = `<span style="font-size:0.72rem;color:var(--muted);align-self:center;margin-right:2px;">💊 suggestions:</span>` +
-                list.map(d => `<button type="button" class="drug-chip" data-drug="${d}">${d}</button>`).join('');
+                list.map(d => `<button type="button" class="drug-chip" data-drug="${d}">${d}</button>`).join('') +
+                `<button type="button" class="drug-chip" data-drug="__other__">✏️ Other</button>`;
             box.querySelectorAll('.drug-chip').forEach(chip => {
                 chip.addEventListener('click', () => {
-                    groupEl.querySelector('.drug-name').value = chip.dataset.drug;
+                    const input = groupEl.querySelector('.drug-name');
+                    if (chip.dataset.drug === '__other__') {   // custom entry
+                        input.value = '';
+                        input.placeholder = 'Type the drug name (not on the list)…';
+                        input.focus();
+                    } else {
+                        input.value = chip.dataset.drug;
+                    }
                 });
             });
         }
