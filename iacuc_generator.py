@@ -147,6 +147,9 @@ def _study_purpose(rows, study):
              f"in {_list_sentence(species, 'and') or 'laboratory rodents'}."]
     if paradigms:
         parts.append(f"The work falls within {_list_sentence(paradigms)} research.")
+    design = _s(study.get("design"))
+    if design:
+        parts.append(f"The study follows a {design} experimental design.")
     parts.append("Live animals are required because the whole-organism response — "
                  "absorption, distribution, metabolism, systemic toxicity and organ-level "
                  "effects — cannot be reproduced in cell-based or in-vitro systems.")
@@ -916,15 +919,17 @@ def _fill_row(table, row_idx, values):
             _write_cell(cells[i], v)
 
 
-def _reduce_text(rows):
+def _reduce_text(rows, design=""):
     """Statistical sample-size justification — reuses the platform's own
-    power-analysis rationale (never a fabricated one)."""
+    power-analysis rationale (never a fabricated one). Prefixed with the study
+    design type when the researcher selected one."""
+    prefix = f"Study design: {design}. " if _s(design) else ""
     for _, a, _ in rows:
         r = _s(a.get('rationale'))
         if r and 'control should match' not in r.lower():
-            return r
+            return prefix + r
     ns = [_s(g.get('num_mice')) for g, _, _ in rows if _s(g.get('num_mice'))]
-    return ("Group sizes were determined by a priori power analysis (two-sided "
+    return (prefix + "Group sizes were determined by a priori power analysis (two-sided "
             "α = 0.05, power = 0.80) for the primary endpoint, using the fewest "
             "animals expected to yield statistically valid results"
             + (f"; planned n per group: {', '.join(ns)}." if ns else "."))
@@ -1043,7 +1048,7 @@ def fill_form_controls(doc, rows, admin, study):
                 "databases) confirmed that the specific question addressed here is "
                 "unresolved; the study does not duplicate published work.")
     cb(21, 0)                                    # reduced to fewest? YES
-    explain(21, _reduce_text(rows))
+    explain(21, _reduce_text(rows, (study or {}).get('design')))
     cb(22, 0)                                    # potential for pain/distress? YES
     explain(22, "Any potential for pain or distress is minimised by trained "
                 "handling, the least-stressful effective route and volume, structured "
@@ -1061,7 +1066,7 @@ def fill_form_controls(doc, rows, admin, study):
                         _s(s.get('species') or g.get('species'), 'Mouse'),
                         _s(s.get('planned_animals') or g.get('num_mice'))])
     cbr(25, 2, 0)                                # "determined statistically"
-    row(25, 3, [None, _reduce_text(rows)])       # description alongside it
+    row(25, 3, [None, _reduce_text(rows, (study or {}).get('design'))])   # description
 
     # ── PART 3 — quantification of animals ────────────────────────────────
     cat = 'Category D' if pain else 'Category C'
