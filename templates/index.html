@@ -927,6 +927,23 @@
             </div>
         </div>
 
+        <!-- Experimental Design -->
+        <div class="meta-section">
+            <h2>🧬 Experimental Design</h2>
+            <div class="meta-row">
+                <div class="form-group">
+                    <label for="study-design-type">Study Design Type</label>
+                    <select id="study-design-type">
+                        <option value="Standard / Parallel">Standard / Parallel</option>
+                        <option value="Cross-over">Cross-over</option>
+                        <option value="Longitudinal">Longitudinal</option>
+                        <option value="Cage randomized">Cage randomized</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
         <!-- Groups Section -->
         <div class="groups-section">
             <h2>🧪 Experimental Groups</h2>
@@ -2052,6 +2069,7 @@
                 outcomes: v('study-outcomes'),
                 methods: v('study-methods'),
                 duration: iacucChip('study_duration'),
+                design: v('study-design-type'),
                 refine: {
                     background: chk('refine-background'),
                     hypothesis: chk('refine-hypothesis'),
