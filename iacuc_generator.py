@@ -288,29 +288,32 @@ def _select_references(rows, drugs, organs, want=10):
     return (oa + other)[:want]
 
 
-def _literature_background(rows, researcher_background=""):
+def _literature_background(rows, researcher_background="", refine=False):
     drugs = _drugs(rows)
     organs = _join_unique(_s(g.get("target_organ")) for g, _, _ in rows
                           if _s(g.get("target_organ")).lower() not in ("", "general", "none"))
     overviews = _join_unique(_drug_overview_text(s) for _, _, s in rows if _drug_overview_text(s))
     lead = _list_sentence(drugs) or "the test article(s)"
     is_are = "is" if len(drugs) == 1 else "are"
-
-    # Subject-focused background. If the researcher supplied their own background
-    # (optional box in the platform) it leads; the platform then adds the
-    # compound context and the references.
-    paras = []
     rb = _s(researcher_background)
-    if rb:
-        paras.append(rb)
-    if overviews:
-        paras.append(" ".join(overviews[:2]))
-    subj = f"{lead} {is_are} of toxicological interest"
-    if organs:
-        subj += f", with particular relevance to the {_list_sentence(organs)}"
-    subj += (". The present study examines the dose–response relationship and target-organ "
-             "effects of the compound in a rodent model.")
-    paras.append(subj)
+
+    paras = []
+    if rb and not refine:
+        # Copy the researcher's background verbatim (grammar/format tidy-up only);
+        # the platform only appends the reference list below.
+        paras.append(_clean_text(rb))
+    else:
+        # Platform writes/expands the background from reputable sources.
+        if rb:
+            paras.append(_clean_text(rb))
+        if overviews:
+            paras.append(" ".join(overviews[:2]))
+        subj = f"{lead} {is_are} of toxicological interest"
+        if organs:
+            subj += f", with particular relevance to the {_list_sentence(organs)}"
+        subj += (". The present study examines the dose–response relationship and target-organ "
+                 "effects of the compound in a rodent model.")
+        paras.append(subj)
 
     # References — Vancouver style, on-topic, open-access prioritised.
     refs, n = [], 1
@@ -350,10 +353,13 @@ def _research_aims(rows):
     return "\n".join(f"{i}. {a}" for i, a in enumerate(aims, 1))
 
 
-def _procedures_overview(rows, acclim_days="", methods=""):
+def _procedures_overview(rows, acclim_days="", methods="", duration=""):
     """PART 6 overview — a clean, professional list of the manipulations, then
     the researcher's optional free-text methods, then a representative timeline."""
     lines = ["The following procedures and manipulations will be performed:"]
+    dur = _s(duration)
+    if dur:
+        lines.insert(0, f"Expected study duration: {dur}.")
     acclim = _s(acclim_days)
     lines.append(f"1. Acclimatization: animals are allowed to acclimatize to the facility for "
                  f"{acclim + ' days' if acclim else 'a defined period'} prior to any procedure, "
@@ -550,21 +556,53 @@ def _funding(admin):
 
 # ── main entry point ──────────────────────────────────────────────────────
 
+def _clean_text(t):
+    """Light grammar/format tidy-up for text the researcher wants copied as-is:
+    collapse whitespace, capitalise the first letter, ensure a closing period."""
+    t = re.sub(r'\s+', ' ', _s(t)).strip()
+    if not t:
+        return ""
+    t = t[0].upper() + t[1:]
+    if t[-1] not in '.!?:':
+        t += '.'
+    return t
+
+
 def build_context(payload):
     study = payload.get("study") or {}
     admin = payload.get("admin") or {}
+    refine = study.get("refine") or {}
     rows = _pair(payload.get("groups") or [], payload.get("analysis") or [])
+
+    # PART 4 Aims ← researcher's Hypothesis & Objectives (verbatim unless they
+    # ticked "review & rewrite"; if empty, generated from the study data).
+    hyp = _s(study.get("hypothesis"))
+    if hyp and not refine.get("hypothesis"):
+        research_aims = _clean_text(hyp)
+    elif hyp:
+        research_aims = _clean_text(hyp) + "\n\n" + _research_aims(rows)
+    else:
+        research_aims = _research_aims(rows)
+
+    # PART 2 Expected outcomes ← researcher's Outcomes field (same logic)
+    out_txt = _s(study.get("outcomes"))
+    if out_txt and not refine.get("outcomes"):
+        expected_outcomes = _clean_text(out_txt)
+    else:
+        expected_outcomes = _expected_outcomes(rows)
+
     return {
         "study_purpose": _study_purpose(rows, study),
         "what_done": _what_done(rows),
-        "expected_outcomes": _expected_outcomes(rows),
+        "expected_outcomes": expected_outcomes,
         "study_benefit": _study_benefit(rows),
         "strain_health_issues": _strain_health_issues(rows),
         "scientific_justification": _scientific_justification(rows),
-        "literature_background": _literature_background(rows, study.get("background")),
-        "research_aims": _research_aims(rows),
+        "literature_background": _literature_background(rows, study.get("background"),
+                                                        refine.get("background")),
+        "research_aims": research_aims,
         "procedures_overview": _procedures_overview(rows, admin.get("acclimatization_days"),
-                                                     study.get("methods")),
+                                                     study.get("methods"), study.get("duration")),
         "experimental_endpoints": _experimental_endpoints(rows),
         "humane_endpoints": _humane_endpoints(rows),
         "observation_frequency": _observation_frequency(rows),

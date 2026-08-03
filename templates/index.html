@@ -874,17 +874,56 @@
                     <input type="text" id="institution" placeholder="University Research Center">
                 </div>
             </div>
+            <style>
+              .refine-check { display:flex; align-items:flex-start; gap:7px; margin-top:6px;
+                              font-size:.8rem; color:#475569; cursor:pointer; }
+              .refine-check input { width:15px; height:15px; margin-top:1px; flex:0 0 auto; }
+            </style>
             <div style="margin-top:14px;">
                 <label for="study-background" style="font-weight:600;">📖 Background / Rationale
-                    <span style="font-weight:400;color:var(--muted);font-size:.85rem;">(optional — for the IACUC literature review)</span></label>
-                <textarea id="study-background" rows="3" placeholder="In your own words, briefly describe the study rationale and background. The platform will expand it and add the compound context and references."
+                    <span style="font-weight:400;color:var(--muted);font-size:.85rem;">(optional — maps to IACUC Part 4: Literature &amp; Background)</span></label>
+                <textarea id="study-background" rows="3" placeholder="In your own words, briefly describe the study rationale and background..."
                     style="width:100%;padding:10px;margin-top:4px;border:1px solid var(--border);border-radius:8px;resize:vertical;"></textarea>
+                <label class="refine-check"><input type="checkbox" id="refine-background" data-refine="background">
+                    <span>✍️ Review &amp; rewrite this for me from reputable scientific sources (leave unchecked to copy my text as-is, with only grammar/format tidy-up).</span></label>
+            </div>
+            <div style="margin-top:12px;">
+                <label for="study-hypothesis" style="font-weight:600;">🎯 Primary Hypothesis &amp; Scientific Objectives
+                    <span style="font-weight:400;color:var(--muted);font-size:.85rem;">(optional — maps to IACUC Part 4: Aims)</span></label>
+                <textarea id="study-hypothesis" rows="3" placeholder="Describe your main hypothesis and objectives..."
+                    style="width:100%;padding:10px;margin-top:4px;border:1px solid var(--border);border-radius:8px;resize:vertical;"></textarea>
+                <label class="refine-check"><input type="checkbox" id="refine-hypothesis" data-refine="hypothesis">
+                    <span>✍️ Review &amp; rewrite this for me from reputable scientific sources (leave unchecked to copy my text as-is, with only grammar/format tidy-up).</span></label>
+            </div>
+            <div style="margin-top:12px;">
+                <label for="study-outcomes" style="font-weight:600;">📊 Primary &amp; Secondary Outcomes
+                    <span style="font-weight:400;color:var(--muted);font-size:.85rem;">(optional — maps to IACUC Part 2: Expected outcomes)</span></label>
+                <textarea id="study-outcomes" rows="3" placeholder="List the expected primary and secondary outcomes..."
+                    style="width:100%;padding:10px;margin-top:4px;border:1px solid var(--border);border-radius:8px;resize:vertical;"></textarea>
+                <label class="refine-check"><input type="checkbox" id="refine-outcomes" data-refine="outcomes">
+                    <span>✍️ Review &amp; rewrite this for me from reputable scientific sources (leave unchecked to copy my text as-is, with only grammar/format tidy-up).</span></label>
+            </div>
+            <div style="margin-top:12px;">
+                <label style="font-weight:600;">⏳ Expected Study Duration
+                    <span style="font-weight:400;color:var(--muted);font-size:.85rem;">(Optional)</span></label>
+                <div class="ichip-row" data-field="study_duration" style="margin-top:4px;">
+                    <button type="button" class="ichip" data-value="1 month">1 month</button>
+                    <button type="button" class="ichip" data-value="3 months">3 months</button>
+                    <button type="button" class="ichip" data-value="6 months">6 months</button>
+                    <button type="button" class="ichip" data-value="1 year">1 year</button>
+                    <button type="button" class="ichip" data-value="2 years">2 years</button>
+                    <button type="button" class="ichip" data-value="__other__">Customise…</button>
+                </div>
+                <input id="study-duration-custom" type="text" placeholder="Enter a custom duration (e.g., 18 months)"
+                    style="display:none;width:100%;padding:10px;margin-top:6px;border:1px solid var(--border);border-radius:8px;">
             </div>
             <div style="margin-top:12px;">
                 <label for="study-methods" style="font-weight:600;">🔬 Methods / Procedure
                     <span style="font-weight:400;color:var(--muted);font-size:.85rem;">(optional — added to IACUC Part 6)</span></label>
                 <textarea id="study-methods" rows="3" placeholder="Optional: any specific methods or procedure details you want added to the IACUC Procedures section."
                     style="width:100%;padding:10px;margin-top:4px;border:1px solid var(--border);border-radius:8px;resize:vertical;"></textarea>
+                <label class="refine-check"><input type="checkbox" id="refine-methods" data-refine="methods">
+                    <span>✍️ Review &amp; rewrite this for me from reputable scientific sources (leave unchecked to copy my text as-is, with only grammar/format tidy-up).</span></label>
             </div>
         </div>
 
@@ -1907,13 +1946,7 @@
                 // (kept only in memory — never persisted).
                 window.__lastAnalysis = results;
                 window.__lastGroups = groupsData;
-                window.__lastStudy = {
-                    study_title: document.getElementById('study-title').value || '',
-                    pi_name: document.getElementById('pi-name').value || '',
-                    institution: document.getElementById('institution').value || '',
-                    background: (document.getElementById('study-background')?.value || '').trim(),
-                    methods: (document.getElementById('study-methods')?.value || '').trim()
-                };
+                window.__lastStudy = collectStudyInfo();
 
                 // "Auto-Fill IACUC Form" call-to-action on the results.
                 const iacucBar = document.createElement('div');
@@ -1974,7 +2007,8 @@
         // Which "Other" free-text input belongs to which chip row
         const IACUC_OTHER_INPUT = {
             animal_source: 'iacuc-animal-source-other',
-            acclimatization_days: 'iacuc-acclim-other'
+            acclimatization_days: 'iacuc-acclim-other',
+            study_duration: 'study-duration-custom'
         };
         // Single-select chip rows in the IACUC modal (one tap = one choice)
         document.addEventListener('click', function(e) {
@@ -2001,6 +2035,30 @@
                 val = inp ? inp.value.trim() : '';
             }
             return val;
+        }
+
+        // Collect Study Information (title/PI + the optional narrative fields and
+        // their "review & rewrite" toggles) — used for both the analysis payload
+        // and the IACUC-form payload.
+        function collectStudyInfo() {
+            const v = id => (document.getElementById(id)?.value || '').trim();
+            const chk = id => !!document.getElementById(id)?.checked;
+            return {
+                study_title: v('study-title'),
+                pi_name: v('pi-name'),
+                institution: v('institution'),
+                background: v('study-background'),
+                hypothesis: v('study-hypothesis'),
+                outcomes: v('study-outcomes'),
+                methods: v('study-methods'),
+                duration: iacucChip('study_duration'),
+                refine: {
+                    background: chk('refine-background'),
+                    hypothesis: chk('refine-hypothesis'),
+                    outcomes: chk('refine-outcomes'),
+                    methods: chk('refine-methods')
+                }
+            };
         }
 
         window.addIacucMember = function() {
@@ -2034,10 +2092,7 @@
                 });
             });
             const payload = {
-                study: Object.assign({}, window.__lastStudy || {}, {
-                    background: (document.getElementById('study-background')?.value || '').trim(),
-                    methods: (document.getElementById('study-methods')?.value || '').trim()
-                }),
+                study: collectStudyInfo(),   // read fresh (fields may change after analysis)
                 groups: window.__lastGroups || [],
                 analysis: window.__lastAnalysis || [],
                 admin: {
