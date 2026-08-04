@@ -1,0 +1,21 @@
+{
+  "key": "ames",
+  "task": "classification",
+  "label": "Mutagenicity (Ames)",
+  "positive_meaning": "mutagenic (Ames positive)",
+  "descriptor_names": [
+    "molecular_weight",
+    "logp",
+    "h_donors",
+    "h_acceptors",
+    "rotatable_bonds",
+    "aromatic_rings",
+    "tpsa"
+  ],
+  "fp_bits": 256,
+  "fp_radius": 2,
+  "n_train": 6186,
+  "n_test": 1092,
+  "test_auc": 0.8693575449231435,
+  "source": "TDC AMES (Xu et al.)"
+}

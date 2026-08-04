@@ -2117,6 +2117,19 @@
                                     ${s.blood_volume_ml ? `<div class="stile-sub">blood needed: ${s.blood_volume_ml} mL ${s.blood_safe === false ? '⚠️ over safe limit' : '✓ within safe limit'}</div>` : ''}
                                     ${(s.toxicity_endpoints && s.toxicity_endpoints.length) ? `<div class="stile-sub">endpoints: ${s.toxicity_endpoints.join(', ')}</div>` : ''}
                                 </div>
+                                ${(s.ml_flags && s.ml_flags.length) ? `
+                                <div class="summary-tile wide">
+                                    <div class="stile-label">🤖 ML predicted flags <span style="font-weight:400;">(structure-based screening — verify experimentally)</span></div>
+                                    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;">
+                                        ${s.ml_flags.map(f => {
+                                            const pct = Math.round(f.probability * 100);
+                                            const c = !f.is_risk ? ['#eff6ff','#1d4ed8','#bfdbfe'] : (f.flag === 'high' ? ['#fef2f2','#b91c1c','#fecaca'] : ['#f0fdf4','#166534','#bbf7d0']);
+                                            const verdict = f.is_risk ? (f.flag === 'high' ? 'likely' : 'unlikely') : (f.flag === 'high' ? 'yes' : 'no');
+                                            return `<span title="AUC ${f.auc} · ${f.source}" style="padding:4px 9px;border-radius:8px;font-size:.8rem;font-weight:600;background:${c[0]};color:${c[1]};border:1px solid ${c[2]};">${f.label}: ${verdict} (${pct}%)</span>`;
+                                        }).join('')}
+                                    </div>
+                                    <div class="stile-sub">Structure-based ML estimates (test AUC 0.81–0.92) — screening aids, not diagnoses.</div>
+                                </div>` : ''}
                             </div>
                             <div class="ai-dosing-card">
                                 <div class="ai-dosing-head">
@@ -2124,8 +2137,8 @@
                                     <span class="ai-dosing-title">AI Dosing Recommendations</span>
                                 </div>
                                 <div class="ai-dosing-row">
-                                    <span class="ai-dosing-key">Safer Dosing Range:</span>
-                                    <span class="ai-dosing-val${s.safer_dosing_range ? '' : ' placeholder'}">${s.safer_dosing_range || 'e.g., 5 – 10 mg/kg to maintain efficacy while minimizing toxicity risk'}</span>
+                                    <span class="ai-dosing-key">Safer Dosing Range <span style="color:var(--info);">🔬 LD50</span>:</span>
+                                    <span class="ai-dosing-val${s.safe_dose ? '' : ' placeholder'}">${s.safe_dose ? `Category-based starting dose ${s.safe_dose.starting_dose}; stay below a safety ceiling ≈ ${s.safe_dose.safety_ceiling_mg_kg} mg/kg (~1/10 of estimated LD50 ${s.safe_dose.ld50_mg_kg} mg/kg, ${s.safe_dose.ld50_source === 'experimental' ? 'experimental' : 'model'}).${s.safe_dose.current_pct_ld50 != null ? ` Your dose ${s.safe_dose.current_dose} mg/kg ≈ ${s.safe_dose.current_pct_ld50}% of LD50.` : ''} Safety margin — not an efficacy range.` : 'e.g., derived from the estimated LD50 once toxicity is available'}</span>
                                 </div>
                                 <div class="ai-dosing-row">
                                     <span class="ai-dosing-key">Alternative Options:</span>

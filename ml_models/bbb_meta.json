@@ -1,0 +1,21 @@
+{
+  "key": "bbb",
+  "task": "classification",
+  "label": "Blood-brain barrier",
+  "positive_meaning": "able to cross the blood-brain barrier",
+  "descriptor_names": [
+    "molecular_weight",
+    "logp",
+    "h_donors",
+    "h_acceptors",
+    "rotatable_bonds",
+    "aromatic_rings",
+    "tpsa"
+  ],
+  "fp_bits": 256,
+  "fp_radius": 2,
+  "n_train": 1725,
+  "n_test": 305,
+  "test_auc": 0.920153791130186,
+  "source": "TDC BBB_Martins"
+}

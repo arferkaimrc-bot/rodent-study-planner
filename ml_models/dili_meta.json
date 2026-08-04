@@ -1,0 +1,21 @@
+{
+  "key": "dili",
+  "task": "classification",
+  "label": "Hepatotoxicity (DILI)",
+  "positive_meaning": "drug-induced liver injury",
+  "descriptor_names": [
+    "molecular_weight",
+    "logp",
+    "h_donors",
+    "h_acceptors",
+    "rotatable_bonds",
+    "aromatic_rings",
+    "tpsa"
+  ],
+  "fp_bits": 256,
+  "fp_radius": 2,
+  "n_train": 403,
+  "n_test": 72,
+  "test_auc": 0.808641975308642,
+  "source": "TDC DILI"
+}

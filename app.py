@@ -125,6 +125,10 @@ class Config:
     # Trained half-life model (real data: TDC Half_Life_Obach — HUMAN PK, relative)
     HALFLIFE_MODEL_PATH = './ml_models/halflife_model.pkl'
     HALFLIFE_META_PATH = './ml_models/halflife_meta.json'
+
+    # Batch of binary safety/ADME classifiers (loaded generically from ml_models/).
+    # Extend this list as more <key>_model.pkl are trained (train_flags_models.py).
+    ML_FLAG_KEYS = ['herg', 'dili', 'ames', 'bbb']
     
     # Toxicity prediction settings
     TOXICITY_CONFIDENCE_THRESHOLD = 60  # Minimum confidence to trust predictions
@@ -449,6 +453,19 @@ class ToxicityPredictor:
                 logger.warning("Trained half-life model not found; run train_halflife_model.py")
         except Exception as e:
             logger.error(f"Failed to load half-life model: {e}")
+        # Batch of binary safety/ADME classifiers (hERG, DILI, Ames, BBB, …)
+        self.flag_models = {}   # key -> (model, meta)
+        for key in Config.ML_FLAG_KEYS:
+            try:
+                mpath = os.path.join(Config.ML_MODEL_PATH, f'{key}_model.pkl')
+                jpath = os.path.join(Config.ML_MODEL_PATH, f'{key}_meta.json')
+                if os.path.exists(mpath):
+                    meta = json.load(open(jpath)) if os.path.exists(jpath) else {}
+                    self.flag_models[key] = (joblib.load(mpath), meta)
+            except Exception as e:
+                logger.error(f"Failed to load flag model {key}: {e}")
+        if self.flag_models:
+            logger.info(f"Loaded {len(self.flag_models)} ML flag models: {list(self.flag_models)}")
         logger.info("ToxicityPredictor initialized")
     
     def get_chemical_structure(self, drug_name):
@@ -688,6 +705,38 @@ class ToxicityPredictor:
             'source': 'ml_model',
             'source_detail': (self.halflife_meta or {}).get('source', 'trained model'),
         }
+
+    # Which flag keys are safety RISKS (high probability = concern) vs neutral
+    # structural properties (e.g. BBB penetration is informative, not a risk).
+    _RISK_FLAG_KEYS = {'herg', 'dili', 'ames'}
+
+    def predict_flags_ml(self, smiles):
+        """Run every loaded binary safety/ADME classifier on a SMILES.
+        Returns a list of flag dicts (probability of the positive class) or []."""
+        if not self.flag_models:
+            return []
+        out = []
+        for key, (model, meta) in self.flag_models.items():
+            feats = self._featurize_smiles(smiles, meta)
+            if feats is None:
+                continue
+            X, _mw = feats
+            try:
+                p = float(model.predict_proba(X)[0][1])
+            except Exception as e:
+                logger.error(f"Flag model {key} prediction failed: {e}")
+                continue
+            out.append({
+                'key': key,
+                'label': meta.get('label', key),
+                'probability': round(p, 2),
+                'flag': 'high' if p >= 0.5 else 'low',
+                'is_risk': key in self._RISK_FLAG_KEYS,
+                'meaning': meta.get('positive_meaning', ''),
+                'auc': round(meta.get('test_auc', 0.75), 2),
+                'source': meta.get('source', ''),
+            })
+        return out
 
     def _parse_dose_mgkg(self, dose_str):
         """Parse a ChemIDplus dose string like '250 mg/kg' -> 250.0 (mg/kg)."""
@@ -3491,6 +3540,7 @@ def get_prediction_and_suggestion(group, all_groups_count=1):
         # (solubility) and dosing frequency (half-life). Skip controls.
         solubility = None
         halflife = None
+        ml_flags = []
         if not is_control:
             try:
                 _struct = toxicity_predictor.get_chemical_structure(drug)
@@ -3498,8 +3548,30 @@ def get_prediction_and_suggestion(group, all_groups_count=1):
                     _smi = _struct['smiles']
                     solubility = toxicity_predictor.predict_solubility_ml(_smi)
                     halflife = toxicity_predictor.predict_halflife_ml(_smi)
+                    ml_flags = toxicity_predictor.predict_flags_ml(_smi)
             except Exception as e:
                 logger.warning(f"ML property prediction failed for {drug}: {e}")
+
+        # Toxicity-based safer-dosing guidance, derived from the estimated LD50
+        # (a SAFETY margin, not an efficacy range). Skip controls.
+        safe_dose = None
+        if not is_control and ld50_val and tox_cat:
+            try:
+                guide = toxicity_predictor.get_safe_dose_recommendations(
+                    tox_cat, group.get('route', 'oral'))
+                dose_val = parse_float_safe(group.get('dose'), 0)
+                safe_dose = {
+                    'ld50_mg_kg': ld50_val,
+                    'ld50_source': tox_source,          # experimental / ml_model
+                    'starting_dose': guide.get('starting_dose'),
+                    'max_dose': guide.get('max_dose'),
+                    'safety_ceiling_mg_kg': round(ld50_val * 0.1, 1),   # ~1/10 LD50
+                    'current_dose': dose_val or None,
+                    'current_pct_ld50': round(dose_val / ld50_val * 100, 1) if dose_val else None,
+                    'monitoring': guide.get('monitoring'),
+                }
+            except Exception as e:
+                logger.warning(f"Safe-dose derivation failed for {drug}: {e}")
 
         return {
             'species': species,
@@ -3528,6 +3600,8 @@ def get_prediction_and_suggestion(group, all_groups_count=1):
             'toxicity_source': tox_source,  # experimental vs ml_model (estimate)
             'solubility': solubility,       # ML aqueous-solubility estimate (vehicle hint)
             'halflife': halflife,           # ML half-life estimate (human PK; frequency hint)
+            'safe_dose': safe_dose,         # LD50-derived safer-dosing guidance (safety margin)
+            'ml_flags': ml_flags,           # ML safety/ADME classifier flags (hERG, DILI, Ames, BBB)
             'timeline': build_protocol_timeline(group, animal_word),
             'welfare': welfare,
             'biological_advice': biological_advice_for(species, group),

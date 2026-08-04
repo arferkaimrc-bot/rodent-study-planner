@@ -1,0 +1,21 @@
+{
+  "key": "herg",
+  "task": "classification",
+  "label": "hERG cardiotoxicity",
+  "positive_meaning": "a hERG blocker (potential cardiotoxicity)",
+  "descriptor_names": [
+    "molecular_weight",
+    "logp",
+    "h_donors",
+    "h_acceptors",
+    "rotatable_bonds",
+    "aromatic_rings",
+    "tpsa"
+  ],
+  "fp_bits": 256,
+  "fp_radius": 2,
+  "n_train": 556,
+  "n_test": 99,
+  "test_auc": 0.8918406072106262,
+  "source": "TDC hERG (Karim et al.)"
+}
