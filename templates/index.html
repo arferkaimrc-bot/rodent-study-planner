@@ -394,6 +394,31 @@
             accent-color: var(--primary);
         }
 
+        /* Outcome Measures — categorized cards */
+        .outcome-category {
+            margin-top: 12px;
+            padding: 12px 14px;
+            border: 1.5px solid var(--border);
+            border-radius: 12px;
+            background: rgba(38,166,91,0.04);
+        }
+
+        .outcome-category-title {
+            font-weight: 700;
+            font-size: 0.9rem;
+            color: #0f5f32;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .outcome-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(155px, 1fr));
+            gap: 8px;
+        }
+
         .sample-types-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
@@ -814,6 +839,7 @@
             .summary-grid { grid-template-columns: 1fr 1fr !important; }
             .sample-types-grid { grid-template-columns: 1fr !important; }
             .tox-endpoints-grid { grid-template-columns: 1fr !important; }
+            .outcome-grid { grid-template-columns: 1fr !important; }
             .main-title { font-size: 1.6rem !important; }
         }
 
@@ -1478,23 +1504,37 @@
                         </div>
 
                         <div class="form-group" style="grid-column: 1 / -1;">
-                            <label>🧪 Toxicity Endpoints to Assess:</label>
-                            <div class="tox-endpoints-grid">
-                                ${(() => {
-                                    const std = ['Hepatotoxicity (ALT/AST)','Nephrotoxicity (BUN/Creatinine)','Cardiotoxicity (Troponin/ECG)','Neurological / Grimace Score','Weight fluctuation curves','Histopathology assessment'];
-                                    const chosen = data?.toxicity_endpoints || [];
-                                    const extras = chosen.filter(e => !std.includes(e)); // custom ones
-                                    return std.concat(extras).map(ep => `
-                                        <label class="tox-endpoint">
-                                            <input type="checkbox" class="tox-endpoint-cb" value="${ep}" ${chosen.includes(ep) ? 'checked' : ''}>
-                                            <span>${ep}</span>
-                                        </label>`).join('');
-                                })()}
-                            </div>
-                            <div style="display:flex; gap:6px; margin-top:8px;">
-                                <input type="text" class="tox-endpoint-custom" placeholder="Add another endpoint…" style="flex:1; min-width:120px;">
-                                <button type="button" class="tl-add-btn" style="margin:0;" onclick="addCustomEndpoint(this)">➕ Add</button>
-                            </div>
+                            <label>📊 Outcome Measures:</label>
+                            ${(() => {
+                                const OUTCOME_CATEGORIES = [
+                                    { icon:'🔬', name:'Histology', items:['H&E','IHC','Oil Red O'] },
+                                    { icon:'🫀', name:'Cardiovascular', items:['Blood pressure','ECG','Lipids'] },
+                                    { icon:'🍬', name:'Metabolic', items:['Blood glucose','OGTT','ITT','Insulin','HOMA-IR'] },
+                                    { icon:'🔥', name:'Inflammation', items:['TNF-α','IL-6','IL-1β','CRP'] },
+                                    { icon:'🧬', name:'Molecular', items:['Western blot','ELISA','qPCR'] },
+                                    { icon:'🦠', name:'Vaccines / Infection', items:['Virus titer','Chronic infection','Recovery','Death'] },
+                                ];
+                                const chosen = data?.toxicity_endpoints || [];
+                                return OUTCOME_CATEGORIES.map(cat => `
+                                    <div class="outcome-category">
+                                        <div class="outcome-category-title">${cat.icon} ${cat.name}</div>
+                                        <div class="outcome-grid">
+                                            ${cat.items.map(m => `
+                                                <label class="tox-endpoint">
+                                                    <input type="checkbox" class="tox-endpoint-cb" value="${m}" ${chosen.includes(m) ? 'checked' : ''}>
+                                                    <span>${m}</span>
+                                                </label>`).join('')}
+                                            <label class="tox-endpoint">
+                                                <input type="checkbox" class="tox-endpoint-cb outcome-other-cb" value="Other"
+                                                       onchange="const b=this.closest('.outcome-category'),i=b.querySelector('.outcome-other-input');if(this.checked){i.style.display='block';i.focus();}else{i.style.display='none';i.value='';this.value='Other';}">
+                                                <span>Other</span>
+                                            </label>
+                                        </div>
+                                        <input type="text" class="outcome-other-input" placeholder="Specify other ${cat.name} measure…"
+                                               style="display:none; margin-top:8px;"
+                                               oninput="const cb=this.closest('.outcome-category').querySelector('.outcome-other-cb');cb.value=this.value.trim()||'Other';cb.checked=true;">
+                                    </div>`).join('');
+                            })()}
                         </div>
 
                         <div class="form-group sample-types-container">
