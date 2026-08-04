@@ -2046,6 +2046,12 @@
                         const toxText = (toxPct == null) ? '—' : `${toxPct}%`;
                         const solColor = !s.solubility ? '#64748b' : s.solubility.category === 'low' ? '#ef4444' : s.solubility.category === 'moderate' ? '#f59e0b' : '#10b981';
                         const hlColor = !s.halflife ? '#64748b' : s.halflife.category === 'short' ? '#f59e0b' : '#10b981';
+                        // Alternative Options — from high ML risk flags + paradigm compounds
+                        const altRisks = (s.ml_flags || []).filter(f => f.is_risk && f.flag === 'high').map(f => f.label);
+                        const altDrugs = (DRUG_SUGGESTIONS[s.experiment_type] || []).filter(d => d.toLowerCase() !== (result.drug || '').toLowerCase()).slice(0, 4);
+                        let altText = '';
+                        if (altRisks.length) altText += `Predicted risk flag(s): ${altRisks.join(', ')} — if the design allows, weigh analogues with a lower predicted profile. `;
+                        if (altDrugs.length) altText += `Compounds commonly used in ${s.experiment_type} studies: ${altDrugs.join(', ')}.`;
                         const toxCat = s.toxicity_category ? ` <span style="font-size:0.75rem;text-transform:uppercase;">(${s.toxicity_category})</span>` : '';
                         const samples = (s.samples && s.samples.length) ? s.samples.join(', ') : 'None selected';
 
@@ -2155,7 +2161,7 @@
                                 </div>
                                 <div class="ai-dosing-row">
                                     <span class="ai-dosing-key">Alternative Options:</span>
-                                    <span class="ai-dosing-val${s.alternative_options ? '' : ' placeholder'}">${s.alternative_options || 'e.g., Consider an alternative drug for this specific model'}</span>
+                                    <span class="ai-dosing-val${altText ? '' : ' placeholder'}">${altText || 'e.g., Consider an alternative drug for this specific model'}</span>
                                 </div>
                                 <div class="ai-dosing-row">
                                     <span class="ai-dosing-key">Formulation / Vehicle <span style="color:var(--info);">🤖 ML</span>:</span>

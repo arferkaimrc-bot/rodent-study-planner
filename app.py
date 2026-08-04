@@ -3581,12 +3581,44 @@ def get_prediction_and_suggestion(group, all_groups_count=1):
         _endpoints = group.get('toxicity_endpoints', []) or []
         _organ = (group.get('target_organ') or '').lower()
         rec_samples = []
+        # Substring keyword -> recommended samples. Covers the categorized
+        # Outcome Measures so a user's selection actually drives sampling.
         _ep_map = {
-            'hepatotoxicity': ['Liver tissue', 'Blood (serum)'],
-            'nephrotoxicity': ['Kidney tissue', 'Blood (serum)'],
-            'cardiotoxicity': ['Heart tissue', 'Blood (plasma)'],
-            'neurological':   ['Brain tissue'],
-            'histopathology': ['Target-organ tissue'],
+            # classic toxicity endpoints (custom entries may still use these)
+            'hepatotox': ['Liver tissue', 'Blood (serum)'],
+            'nephrotox': ['Kidney tissue', 'Blood (serum)'],
+            'cardiotox': ['Heart tissue', 'Blood (plasma)'],
+            'neurolog':  ['Brain tissue'],
+            'histopath': ['Target-organ tissue'],
+            # Histology
+            'h&e': ['Target-organ tissue (for histology)'],
+            'ihc': ['Target-organ tissue (for IHC)'],
+            'oil red': ['Liver tissue', 'Adipose tissue'],
+            # Cardiovascular
+            'ecg': ['Heart tissue', 'Blood (plasma)'],
+            'blood pressure': ['Blood (plasma)'],
+            'lipid': ['Blood (serum)'],
+            # Metabolic
+            'glucose': ['Blood (serum)'],
+            'ogtt': ['Blood (serum)'],
+            'itt': ['Blood (serum)'],
+            'insulin': ['Blood (serum)'],
+            'homa': ['Blood (serum)'],
+            # Inflammation
+            'tnf': ['Blood (serum)', 'Spleen tissue'],
+            'il-6': ['Blood (serum)', 'Spleen tissue'],
+            'il-1': ['Blood (serum)', 'Spleen tissue'],
+            'crp': ['Blood (serum)'],
+            # Molecular
+            'western blot': ['Target-organ tissue (for protein)'],
+            'elisa': ['Blood (serum)'],
+            'qpcr': ['Target-organ tissue (for RNA)'],
+            # Oncology
+            'tumor': ['Tumor tissue'],
+            'metasta': ['Lung tissue', 'Liver tissue'],
+            'ki-67': ['Tumor tissue'],
+            # Vaccines / Infection
+            'virus titer': ['Blood (serum)', 'Target-organ tissue'],
         }
         for ep in _endpoints:
             for kw, samps in _ep_map.items():
