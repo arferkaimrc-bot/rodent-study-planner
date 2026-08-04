@@ -117,6 +117,10 @@ class Config:
     # Trained LD50 regression model (real data: TDC LD50_Zhu, rat oral)
     LD50_MODEL_PATH = './ml_models/ld50_model.pkl'
     LD50_META_PATH = './ml_models/ld50_meta.json'
+
+    # Trained aqueous-solubility model (real data: TDC Solubility_AqSolDB)
+    SOLUBILITY_MODEL_PATH = './ml_models/solubility_model.pkl'
+    SOLUBILITY_META_PATH = './ml_models/solubility_meta.json'
     
     # Toxicity prediction settings
     TOXICITY_CONFIDENCE_THRESHOLD = 60  # Minimum confidence to trust predictions
@@ -413,6 +417,20 @@ class ToxicityPredictor:
                 logger.warning("Trained LD50 model not found; run train_ld50_model.py")
         except Exception as e:
             logger.error(f"Failed to load LD50 model: {e}")
+        # Load the trained aqueous-solubility model (TDC Solubility_AqSolDB)
+        self.solubility_model = None
+        self.solubility_meta = None
+        try:
+            if os.path.exists(Config.SOLUBILITY_MODEL_PATH):
+                self.solubility_model = joblib.load(Config.SOLUBILITY_MODEL_PATH)
+                if os.path.exists(Config.SOLUBILITY_META_PATH):
+                    with open(Config.SOLUBILITY_META_PATH) as f:
+                        self.solubility_meta = json.load(f)
+                logger.info("Loaded trained solubility model")
+            else:
+                logger.warning("Trained solubility model not found; run train_solubility_model.py")
+        except Exception as e:
+            logger.error(f"Failed to load solubility model: {e}")
         logger.info("ToxicityPredictor initialized")
     
     def get_chemical_structure(self, drug_name):
@@ -521,9 +539,12 @@ class ToxicityPredictor:
         else:
             return 'very_low', (2000, 99999)
 
-    def _featurize_smiles(self, smiles):
-        """Build the feature vector used by the trained LD50 model."""
-        if not RDKIT_AVAILABLE or not self.ld50_meta:
+    def _featurize_smiles(self, smiles, meta=None):
+        """Build the feature vector for a trained model. Defaults to the LD50
+        meta; the solubility model shares the same descriptor + fingerprint
+        layout, so the same featurizer serves both."""
+        meta = meta or self.ld50_meta
+        if not RDKIT_AVAILABLE or not meta:
             return None
         mol = Chem.MolFromSmiles(smiles)
         if mol is None:
@@ -537,9 +558,9 @@ class ToxicityPredictor:
             'aromatic_rings': Lipinski.NumAromaticRings(mol),
             'tpsa': Descriptors.TPSA(mol),
         }
-        desc_vec = [desc[n] for n in self.ld50_meta['descriptor_names']]
+        desc_vec = [desc[n] for n in meta['descriptor_names']]
         fp = rdMolDescriptors.GetMorganFingerprintAsBitVect(
-            mol, radius=self.ld50_meta['fp_radius'], nBits=self.ld50_meta['fp_bits'])
+            mol, radius=meta['fp_radius'], nBits=meta['fp_bits'])
         return [desc_vec + list(fp)], Descriptors.MolWt(mol)
 
     def predict_ld50_ml(self, smiles):
@@ -568,6 +589,45 @@ class ToxicityPredictor:
             'confidence': confidence,
             'source': 'ml_model',
             'source_detail': (self.ld50_meta or {}).get('source', 'trained model'),
+        }
+
+    @staticmethod
+    def logs_to_solubility(logs):
+        """Map predicted logS (log10 mol/L) to a class + a vehicle/formulation hint."""
+        if logs >= -2:
+            return 'high', 'Aqueous vehicle (saline / PBS) is typically adequate.'
+        elif logs >= -4:
+            return 'moderate', 'May need a co-solvent (e.g. 5-10% DMSO or cyclodextrin) or gentle warming.'
+        else:
+            return 'low', ('Poorly water-soluble — consider DMSO / cyclodextrin / a cosolvent '
+                           'system, a nanosuspension, or a salt form.')
+
+    def predict_solubility_ml(self, smiles):
+        """Predict aqueous solubility (logS) with the trained model. Returns a
+        dict {logS, mg_per_mL, category, vehicle_hint, confidence, source} or None."""
+        if self.solubility_model is None:
+            return None
+        feats = self._featurize_smiles(smiles, self.solubility_meta)
+        if feats is None:
+            return None
+        X, mw = feats
+        try:
+            logs = float(self.solubility_model.predict(X)[0])   # log10(mol/L)
+        except Exception as e:
+            logger.error(f"Solubility model prediction failed: {e}")
+            return None
+        category, vehicle_hint = self.logs_to_solubility(logs)
+        mg_per_mL = (10 ** logs) * mw          # mol/L * g/mol = g/L = mg/mL
+        r2 = (self.solubility_meta or {}).get('test_r2', 0.78)
+        confidence = int(round(55 + 25 * max(0.0, min(1.0, r2))))
+        return {
+            'logS': round(logs, 2),
+            'mg_per_mL': round(mg_per_mL, 3),
+            'category': category,              # high / moderate / low
+            'vehicle_hint': vehicle_hint,
+            'confidence': confidence,
+            'source': 'ml_model',
+            'source_detail': (self.solubility_meta or {}).get('source', 'trained model'),
         }
 
     def _parse_dose_mgkg(self, dose_str):
@@ -3368,6 +3428,17 @@ def get_prediction_and_suggestion(group, all_groups_count=1):
         if not recommended_strain:
             recommended_strain = 'Sprague-Dawley / Wistar' if species == 'Rat' else 'C57BL/6 (most common)'
 
+        # ML aqueous-solubility estimate — informs vehicle / formulation choice
+        # (experimental data would take precedence if available; skip controls).
+        solubility = None
+        if not is_control:
+            try:
+                _struct = toxicity_predictor.get_chemical_structure(drug)
+                if _struct.get('success'):
+                    solubility = toxicity_predictor.predict_solubility_ml(_struct['smiles'])
+            except Exception as e:
+                logger.warning(f"Solubility prediction failed for {drug}: {e}")
+
         return {
             'species': species,
             'strain': group.get('strain', ''),
@@ -3393,6 +3464,7 @@ def get_prediction_and_suggestion(group, all_groups_count=1):
             'toxicity_category': tox_cat,
             'ld50_mg_kg': ld50_val,
             'toxicity_source': tox_source,  # experimental vs ml_model (estimate)
+            'solubility': solubility,       # ML aqueous-solubility estimate (vehicle hint)
             'timeline': build_protocol_timeline(group, animal_word),
             'welfare': welfare,
             'biological_advice': biological_advice_for(species, group),

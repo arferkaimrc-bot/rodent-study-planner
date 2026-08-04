@@ -1,0 +1,19 @@
+{
+  "label": "log_solubility_logS_mol_per_L",
+  "descriptor_names": [
+    "molecular_weight",
+    "logp",
+    "h_donors",
+    "h_acceptors",
+    "rotatable_bonds",
+    "aromatic_rings",
+    "tpsa"
+  ],
+  "fp_bits": 256,
+  "fp_radius": 2,
+  "n_train": 8484,
+  "n_test": 1498,
+  "test_mae": 0.7610872151915977,
+  "test_r2": 0.7832242530944895,
+  "source": "TDC Solubility_AqSolDB (Sorkun et al. 2019)"
+}

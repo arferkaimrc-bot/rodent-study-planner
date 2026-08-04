@@ -2044,6 +2044,7 @@
                         const toxPct = s.toxicity_percentage;
                         const toxColor = (toxPct == null) ? '#64748b' : toxPct >= 70 ? '#ef4444' : toxPct >= 45 ? '#f59e0b' : '#10b981';
                         const toxText = (toxPct == null) ? '—' : `${toxPct}%`;
+                        const solColor = !s.solubility ? '#64748b' : s.solubility.category === 'low' ? '#ef4444' : s.solubility.category === 'moderate' ? '#f59e0b' : '#10b981';
                         const toxCat = s.toxicity_category ? ` <span style="font-size:0.75rem;text-transform:uppercase;">(${s.toxicity_category})</span>` : '';
                         const samples = (s.samples && s.samples.length) ? s.samples.join(', ') : 'None selected';
 
@@ -2089,6 +2090,12 @@
                                     <div class="stile-value" style="color:${toxColor};">${toxText}${toxCat}</div>
                                     ${s.ld50_mg_kg ? `<div class="stile-sub">LD50 ${s.ld50_mg_kg} mg/kg · ${s.toxicity_source === 'experimental' ? '📗 experimental data' : '📘 model estimate'}</div>` : ''}
                                 </div>
+                                ${s.solubility ? `
+                                <div class="summary-tile">
+                                    <div class="stile-label">💧 Solubility <span style="color:var(--info);font-weight:700;">🤖 ML</span></div>
+                                    <div class="stile-value" style="color:${solColor};text-transform:capitalize;">${s.solubility.category}</div>
+                                    <div class="stile-sub">logS ${s.solubility.logS} · ~${s.solubility.mg_per_mL} mg/mL · ${s.solubility.confidence}% conf</div>
+                                </div>` : ''}
                                 <div class="summary-tile">
                                     <div class="stile-label">🎯 Focus</div>
                                     <div class="stile-value" style="font-size:1.05rem;">${s.target_organ && s.target_organ !== 'General' ? s.target_organ : (s.experiment_type || 'General')}</div>
@@ -2116,6 +2123,10 @@
                                 <div class="ai-dosing-row">
                                     <span class="ai-dosing-key">Alternative Options:</span>
                                     <span class="ai-dosing-val${s.alternative_options ? '' : ' placeholder'}">${s.alternative_options || 'e.g., Consider an alternative drug for this specific model'}</span>
+                                </div>
+                                <div class="ai-dosing-row">
+                                    <span class="ai-dosing-key">Formulation / Vehicle <span style="color:var(--info);">🤖 ML</span>:</span>
+                                    <span class="ai-dosing-val${s.solubility ? '' : ' placeholder'}">${s.solubility ? `Predicted ${s.solubility.category} aqueous solubility (logS ${s.solubility.logS}, ~${s.solubility.mg_per_mL} mg/mL). ${s.solubility.vehicle_hint}` : 'e.g., vehicle guidance appears here once solubility is predicted'}</span>
                                 </div>
                             </div>
                         `;
