@@ -357,6 +357,49 @@
             margin-top: 3px;
         }
 
+        /* AI Dosing Recommendations — positive/helpful info banner (not an error) */
+        .ai-dosing-card {
+            margin-top: 16px;
+            padding: 16px 18px;
+            border: 1.5px solid #86e0b0;
+            border-left: 5px solid var(--primary);
+            border-radius: 12px;
+            background: linear-gradient(180deg, rgba(38,166,91,0.10), rgba(38,166,91,0.035));
+        }
+        .ai-dosing-head {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+        .ai-dosing-icon { font-size: 1.25rem; line-height: 1; }
+        .ai-dosing-title {
+            font-weight: 700;
+            font-size: 1rem;
+            color: #0f5f32;
+        }
+        .ai-dosing-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 2px 8px;
+            padding: 7px 0;
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+        .ai-dosing-row + .ai-dosing-row {
+            border-top: 1px dashed rgba(38,166,91,0.25);
+        }
+        .ai-dosing-key {
+            font-weight: 700;
+            color: #0f5f32;
+            flex: 0 0 auto;
+        }
+        .ai-dosing-val { color: var(--text); }
+        .ai-dosing-val.placeholder {
+            color: var(--muted);
+            font-style: italic;
+        }
+
         .tox-endpoints-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
@@ -2047,6 +2090,20 @@
                                     <div class="stile-sub">you selected: ${samples}</div>
                                     ${s.blood_volume_ml ? `<div class="stile-sub">blood needed: ${s.blood_volume_ml} mL ${s.blood_safe === false ? '⚠️ over safe limit' : '✓ within safe limit'}</div>` : ''}
                                     ${(s.toxicity_endpoints && s.toxicity_endpoints.length) ? `<div class="stile-sub">endpoints: ${s.toxicity_endpoints.join(', ')}</div>` : ''}
+                                </div>
+                            </div>
+                            <div class="ai-dosing-card">
+                                <div class="ai-dosing-head">
+                                    <span class="ai-dosing-icon">💡</span>
+                                    <span class="ai-dosing-title">AI Dosing Recommendations</span>
+                                </div>
+                                <div class="ai-dosing-row">
+                                    <span class="ai-dosing-key">Safer Dosing Range:</span>
+                                    <span class="ai-dosing-val${s.safer_dosing_range ? '' : ' placeholder'}">${s.safer_dosing_range || 'e.g., 5 – 10 mg/kg to maintain efficacy while minimizing toxicity risk'}</span>
+                                </div>
+                                <div class="ai-dosing-row">
+                                    <span class="ai-dosing-key">Alternative Options:</span>
+                                    <span class="ai-dosing-val${s.alternative_options ? '' : ' placeholder'}">${s.alternative_options || 'e.g., Consider an alternative drug for this specific model'}</span>
                                 </div>
                             </div>
                         `;
