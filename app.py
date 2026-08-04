@@ -3736,24 +3736,31 @@ def get_prediction_and_suggestion(group, all_groups_count=1):
             'ml_flags': ml_flags,           # ML safety/ADME classifier flags (hERG, DILI, Ames, BBB)
             'ml_adme': ml_adme,             # ML ADME regression values (LogD, Caco-2, PPBR)
             'clinical_trials': clinical_trials,  # ClinicalTrials.gov context (free)
+            'is_control': is_control,       # lets the UI match control N to treatment N
             'timeline': build_protocol_timeline(group, animal_word),
             'welfare': welfare,
             'biological_advice': biological_advice_for(species, group),
         }
 
     if is_control:
+        # The control gets a REAL recommended number too (balanced design): the
+        # power-analysis N clamped to the rodent-typical range. If a treatment
+        # group is present, the UI matches the control's number to it.
+        _pa = calculate_sample_size_power_analysis(effect_size=0.8, power=0.80, alpha=0.05)
+        _ctrl_n = max(6, min(18, _pa.get('n_per_group', 8))) if _pa.get('success') else 8
+        _ctrl_range = f"{_ctrl_n}-{int(_ctrl_n * 1.1)}"
         # Add blood warnings for control group too
         warnings = []
         if blood_calc['needed'] and blood_calc['safety_color'] != 'green':
             warnings.append(f"Blood collection: {blood_calc['safety_assessment']}")
-        
+
         return {
             "num_mice": group.get('num_mice', ''),
-            "summary": build_summary("Match treatment group"),
-            "sample_size_for_group": "Match treatment group",
-            "recommended_mice": "Match treatment group",
+            "summary": build_summary(_ctrl_range),
+            "sample_size_for_group": _ctrl_range,
+            "recommended_mice": _ctrl_range,
             "toxicity_risk": 0,
-            "rationale": "Control group should match treatment groups.",
+            "rationale": f"Control group: recommended {_ctrl_range} animals per group (balanced with treatment groups).",
             "predicted_outcome": "No pharmacological effect expected.",
             "reference_papers": ref_corpus.get("all_papers", [])[:15],
             "validation_score": 85,

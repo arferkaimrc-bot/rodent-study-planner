@@ -2006,11 +2006,13 @@
                         <div style="opacity:0.9;font-size:0.9rem;margin-top:2px;">${results.length} group(s) analyzed · details for each below</div>
                     </div>`;
 
-                // Control groups should use the same recommended number as the treatment groups.
-                const _treatmentRec = results.find(r => r.summary && r.summary.recommended_animals && /\d/.test(r.summary.recommended_animals));
+                // Balanced design: control groups adopt the treatment groups'
+                // recommended number. (Each group already carries its own real
+                // number; here we only align controls to a treatment when one exists.)
+                const _treatmentRec = results.find(r => r.summary && !r.summary.is_control && r.summary.recommended_animals && /\d/.test(String(r.summary.recommended_animals)));
                 const _treatmentNum = _treatmentRec ? _treatmentRec.summary.recommended_animals : null;
                 results.forEach(r => {
-                    if (r.summary && r.summary.recommended_animals && !/\d/.test(String(r.summary.recommended_animals)) && _treatmentNum) {
+                    if (r.summary && r.summary.is_control && _treatmentNum && String(r.summary.recommended_animals) !== String(_treatmentNum)) {
                         r.summary.recommended_animals = _treatmentNum;
                         r.summary._matched_control = true;
                     }
