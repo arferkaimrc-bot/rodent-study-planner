@@ -90,6 +90,38 @@ def _is_control(g):
     return (not dn) or dn in ("control", "vehicle", "saline", "none") or "control" in gn
 
 
+def _schedule_phrase(g):
+    """Trailing dosing-schedule clause from frequency/duration/time (or '')."""
+    freq = _s(g.get("frequency"))
+    dur = _s(g.get("treatment_duration"))
+    tod = _s(g.get("time_of_dosing"))
+    bits = []
+    if freq:
+        bits.append(freq)
+    if dur:
+        bits.append(f"for {dur}")
+    core = " ".join(bits)
+    if tod:
+        core = (core + " " if core else "") + f"(dosing at {tod})"
+    return f", {core}" if core else ""
+
+
+def _agg_field(rows, key):
+    """Unique non-empty values of a per-group field as an 'a, b and c' sentence."""
+    return _list_sentence([g.get(key) for g, _, _ in rows])
+
+
+def _welfare_params(rows):
+    """Unique welfare-monitoring indicators (checkboxes + Other) across groups."""
+    vals = []
+    for g, _, _ in rows:
+        vals.extend(g.get("welfare_monitoring") or [])
+        wo = _s(g.get("welfare_other"))
+        if wo and wo.lower() != "other":
+            vals.append(wo)
+    return _list_sentence(vals)
+
+
 # ── narrative builders (each returns one answer-box string) ────────────────
 
 _SPECIES_PLURAL = {"mouse": "mice", "rat": "rats"}
@@ -150,6 +182,9 @@ def _study_purpose(rows, study):
     design = _s(study.get("design"))
     if design:
         parts.append(f"The study follows a {design} experimental design.")
+    model = _agg_field(rows, "disease_model")
+    if model:
+        parts.append(f"Disease model and justification: {model.rstrip('.')}.")
     parts.append("Live animals are required because the whole-organism response — "
                  "absorption, distribution, metabolism, systemic toxicity and organ-level "
                  "effects — cannot be reproduced in cell-based or in-vitro systems.")
@@ -187,7 +222,7 @@ def _what_done(rows):
                 veh_txt = f" in {veh}"
             else:
                 veh_txt = ""
-            lines.append(f"• {gname}: {n} {sp} receive {drug}{dose_txt}{veh_txt} by {route_txt}.")
+            lines.append(f"• {gname}: {n} {sp} receive {drug}{dose_txt}{veh_txt} by {route_txt}{_schedule_phrase(g)}.")
     lines.append("All animals are weighed and observed regularly for clinical signs; biological "
                  "samples are collected at defined time-points, after which animals are humanely "
                  "euthanised and tissues collected.")
@@ -410,7 +445,7 @@ def _procedures_overview(rows, acclim_days="", methods="", duration=""):
         else:
             veh_txt = ""
         lines.append(f"{n}. Dosing ({_s(g.get('group_name'), 'group')}): administration of "
-                     f"{drug}{dose_txt}{veh_txt} by {route_txt}.")
+                     f"{drug}{dose_txt}{veh_txt} by {route_txt}{_schedule_phrase(g)}.")
         n += 1
     lines.append(f"{n}. Monitoring: regular body-weight measurement and structured clinical "
                  "observation for signs of toxicity against predefined humane endpoints.")
@@ -422,6 +457,17 @@ def _procedures_overview(rows, acclim_days="", methods="", duration=""):
         n += 1
     lines.append(f"{n}. Termination: humane euthanasia and terminal tissue collection at the "
                  "study endpoint (see Part 8).")
+
+    # test-article preparation / storage supplied by the researcher
+    prep = _agg_field(rows, "drug_preparation")
+    storage = _agg_field(rows, "drug_storage")
+    if prep or storage:
+        lines.append("")
+        lines.append("Test article preparation and storage:")
+        if prep:
+            lines.append(f"• Preparation: {prep}")
+        if storage:
+            lines.append(f"• Storage & stability: {storage}")
 
     # optional researcher-provided methods / procedure detail
     meth = _s(methods)
@@ -463,6 +509,9 @@ def _experimental_endpoints(rows):
         out.append(f"• Assessed measures: {_list_sentence(eps)}.")
     if samples:
         out.append(f"• Terminal samples/tissues: {_list_sentence(samples)}.")
+    crit = _agg_field(rows, "success_criteria")
+    if crit:
+        out.append(f"• Success/failure criteria (expected phenotype): {crit.rstrip('.')}.")
     out.append("• Study endpoint is reached at the scheduled terminal time-point, after "
                "which planned analyses are performed.")
     return "\n".join(out)
@@ -480,13 +529,20 @@ def _welfare_of(rows):
 def _humane_endpoints(rows):
     w = _welfare_of(rows)
     if w and w.get("humane_endpoints"):
-        return _bullets(w["humane_endpoints"])
-    return _bullets([
-        "Body weight loss ≥ 20% from baseline (or ≥ 15% with other clinical signs)",
-        "Body condition score ≤ 2/5 (emaciation)",
-        "Persistent hunched posture, lack of grooming, or hypothermia",
-        "Inability to reach food or water for > 24 h",
-    ])
+        base = _bullets(w["humane_endpoints"])
+    else:
+        base = _bullets([
+            "Body weight loss ≥ 20% from baseline (or ≥ 15% with other clinical signs)",
+            "Body condition score ≤ 2/5 (emaciation)",
+            "Persistent hunched posture, lack of grooming, or hypothermia",
+            "Inability to reach food or water for > 24 h",
+        ])
+    params = _welfare_params(rows)
+    if params:
+        return (f"Welfare indicators monitored: {params}. Animals are removed from study "
+                "and humanely euthanised when any of the following criteria are met:\n"
+                + base)
+    return base
 
 
 def _observation_frequency(rows):
@@ -1288,7 +1344,9 @@ def generate_iacuc_docx(payload):
     rows = _pair(payload.get("groups") or [], payload.get("analysis") or [])
 
     tpl = DocxTemplate(str(TEMPLATE_PATH))
-    tpl.render(build_context(payload))
+    # autoescape so special chars in researcher text (&, <, >) — e.g. the "H&E"
+    # outcome measure — render literally instead of breaking the document XML.
+    tpl.render(build_context(payload), autoescape=True)
     tmp = io.BytesIO()
     tpl.save(tmp)
     tmp.seek(0)

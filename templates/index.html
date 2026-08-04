@@ -1861,6 +1861,11 @@
                     dose: groupEl.querySelector('.dose').value,
                     vehicle: (groupEl.querySelector('.vehicle')?.value || '').trim(),
                     vehicle_volume: (groupEl.querySelector('.vehicle-volume')?.value || '').trim(),
+                    frequency: (groupEl.querySelector('.frequency')?.value || '').trim(),
+                    treatment_duration: (groupEl.querySelector('.treatment-duration')?.value || '').trim(),
+                    time_of_dosing: (groupEl.querySelector('.time-of-dosing')?.value || '').trim(),
+                    drug_preparation: (groupEl.querySelector('.drug-preparation')?.value || '').trim(),
+                    drug_storage: (groupEl.querySelector('.drug-storage')?.value || '').trim(),
                     species: groupEl.querySelector('.species')?.value || 'Mouse',
                     strain: strainValue,
                     sex: groupEl.querySelector('.sex').value,
@@ -1882,7 +1887,11 @@
                     transgenic_line: (groupEl.querySelector('.transgenic-line')?.value || '').trim(),
                     housing_temp: (groupEl.querySelector('.housing-temp')?.value || '').trim(),
                     housing_humidity: (groupEl.querySelector('.housing-humidity')?.value || '').trim(),
-                    housing_light: (groupEl.querySelector('.housing-light')?.value || '').trim()
+                    housing_light: (groupEl.querySelector('.housing-light')?.value || '').trim(),
+                    disease_model: (groupEl.querySelector('.disease-model')?.value || '').trim(),
+                    success_criteria: (groupEl.querySelector('.success-criteria')?.value || '').trim(),
+                    welfare_monitoring: Array.from(groupEl.querySelectorAll('.welfare-cb:checked')).map(cb => cb.value),
+                    welfare_other: (groupEl.querySelector('.welfare-other-cb')?.checked && (groupEl.querySelector('.welfare-other-input')?.value || '').trim()) || ''
                 });
             });
             
