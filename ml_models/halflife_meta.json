@@ -1,0 +1,20 @@
+{
+  "label": "log10_half_life_hours",
+  "species": "human",
+  "descriptor_names": [
+    "molecular_weight",
+    "logp",
+    "h_donors",
+    "h_acceptors",
+    "rotatable_bonds",
+    "aromatic_rings",
+    "tpsa"
+  ],
+  "fp_bits": 256,
+  "fp_radius": 2,
+  "n_train": 566,
+  "n_test": 101,
+  "test_mae": 0.40299139928258426,
+  "test_r2": 0.2737487022857763,
+  "source": "TDC Half_Life_Obach (Obach et al. 2008)"
+}

@@ -121,6 +121,10 @@ class Config:
     # Trained aqueous-solubility model (real data: TDC Solubility_AqSolDB)
     SOLUBILITY_MODEL_PATH = './ml_models/solubility_model.pkl'
     SOLUBILITY_META_PATH = './ml_models/solubility_meta.json'
+
+    # Trained half-life model (real data: TDC Half_Life_Obach — HUMAN PK, relative)
+    HALFLIFE_MODEL_PATH = './ml_models/halflife_model.pkl'
+    HALFLIFE_META_PATH = './ml_models/halflife_meta.json'
     
     # Toxicity prediction settings
     TOXICITY_CONFIDENCE_THRESHOLD = 60  # Minimum confidence to trust predictions
@@ -431,6 +435,20 @@ class ToxicityPredictor:
                 logger.warning("Trained solubility model not found; run train_solubility_model.py")
         except Exception as e:
             logger.error(f"Failed to load solubility model: {e}")
+        # Load the trained half-life model (TDC Half_Life_Obach, human PK)
+        self.halflife_model = None
+        self.halflife_meta = None
+        try:
+            if os.path.exists(Config.HALFLIFE_MODEL_PATH):
+                self.halflife_model = joblib.load(Config.HALFLIFE_MODEL_PATH)
+                if os.path.exists(Config.HALFLIFE_META_PATH):
+                    with open(Config.HALFLIFE_META_PATH) as f:
+                        self.halflife_meta = json.load(f)
+                logger.info("Loaded trained half-life model")
+            else:
+                logger.warning("Trained half-life model not found; run train_halflife_model.py")
+        except Exception as e:
+            logger.error(f"Failed to load half-life model: {e}")
         logger.info("ToxicityPredictor initialized")
     
     def get_chemical_structure(self, drug_name):
@@ -628,6 +646,47 @@ class ToxicityPredictor:
             'confidence': confidence,
             'source': 'ml_model',
             'source_detail': (self.solubility_meta or {}).get('source', 'trained model'),
+        }
+
+    @staticmethod
+    def hours_to_frequency(hours):
+        """Map a predicted half-life (hours) to a class + dosing-frequency hint."""
+        if hours < 3:
+            return 'short', ('Short half-life — frequent dosing (e.g. twice/three-times '
+                             'daily) or continuous delivery may be needed.')
+        elif hours < 12:
+            return 'intermediate', 'Once-to-twice daily dosing is often appropriate.'
+        else:
+            return 'long', 'Long half-life — once daily (or less frequent) dosing may suffice.'
+
+    def predict_halflife_ml(self, smiles):
+        """Predict plasma half-life with the trained model. NOTE: trained on HUMAN
+        data (Obach) and is a modest model — used as a *relative* indicator for
+        dosing frequency, not an absolute rodent value. Returns dict or None."""
+        if self.halflife_model is None:
+            return None
+        feats = self._featurize_smiles(smiles, self.halflife_meta)
+        if feats is None:
+            return None
+        X, _mw = feats
+        try:
+            y = float(self.halflife_model.predict(X)[0])   # log10(hours)
+        except Exception as e:
+            logger.error(f"Half-life model prediction failed: {e}")
+            return None
+        hours = 10 ** y
+        category, frequency_hint = self.hours_to_frequency(hours)
+        r2 = (self.halflife_meta or {}).get('test_r2', 0.27)
+        # Confidence is deliberately conservative — this model is weak (R2~0.27).
+        confidence = int(round(40 + 40 * max(0.0, min(1.0, r2))))
+        return {
+            'hours': round(hours, 1),
+            'category': category,          # short / intermediate / long
+            'frequency_hint': frequency_hint,
+            'confidence': confidence,
+            'species': (self.halflife_meta or {}).get('species', 'human'),
+            'source': 'ml_model',
+            'source_detail': (self.halflife_meta or {}).get('source', 'trained model'),
         }
 
     def _parse_dose_mgkg(self, dose_str):
@@ -3428,16 +3487,19 @@ def get_prediction_and_suggestion(group, all_groups_count=1):
         if not recommended_strain:
             recommended_strain = 'Sprague-Dawley / Wistar' if species == 'Rat' else 'C57BL/6 (most common)'
 
-        # ML aqueous-solubility estimate — informs vehicle / formulation choice
-        # (experimental data would take precedence if available; skip controls).
+        # ML property estimates from structure — inform vehicle/formulation
+        # (solubility) and dosing frequency (half-life). Skip controls.
         solubility = None
+        halflife = None
         if not is_control:
             try:
                 _struct = toxicity_predictor.get_chemical_structure(drug)
                 if _struct.get('success'):
-                    solubility = toxicity_predictor.predict_solubility_ml(_struct['smiles'])
+                    _smi = _struct['smiles']
+                    solubility = toxicity_predictor.predict_solubility_ml(_smi)
+                    halflife = toxicity_predictor.predict_halflife_ml(_smi)
             except Exception as e:
-                logger.warning(f"Solubility prediction failed for {drug}: {e}")
+                logger.warning(f"ML property prediction failed for {drug}: {e}")
 
         return {
             'species': species,
@@ -3465,6 +3527,7 @@ def get_prediction_and_suggestion(group, all_groups_count=1):
             'ld50_mg_kg': ld50_val,
             'toxicity_source': tox_source,  # experimental vs ml_model (estimate)
             'solubility': solubility,       # ML aqueous-solubility estimate (vehicle hint)
+            'halflife': halflife,           # ML half-life estimate (human PK; frequency hint)
             'timeline': build_protocol_timeline(group, animal_word),
             'welfare': welfare,
             'biological_advice': biological_advice_for(species, group),
