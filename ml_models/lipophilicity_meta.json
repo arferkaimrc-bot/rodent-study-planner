@@ -1,0 +1,23 @@
+{
+  "key": "lipophilicity",
+  "task": "regression",
+  "label": "Lipophilicity (LogD)",
+  "unit": "",
+  "log": false,
+  "descriptor_names": [
+    "molecular_weight",
+    "logp",
+    "h_donors",
+    "h_acceptors",
+    "rotatable_bonds",
+    "aromatic_rings",
+    "tpsa"
+  ],
+  "fp_bits": 256,
+  "fp_radius": 2,
+  "n_train": 3570,
+  "n_test": 630,
+  "test_mae": 0.6078502688317778,
+  "test_r2": 0.5794696418443215,
+  "source": "TDC Lipophilicity_AstraZeneca"
+}

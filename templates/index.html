@@ -2130,6 +2130,13 @@
                                     </div>
                                     <div class="stile-sub">Structure-based ML estimates (test AUC 0.81–0.92) — screening aids, not diagnoses.</div>
                                 </div>` : ''}
+                                ${(s.ml_adme && s.ml_adme.length) ? `
+                                <div class="summary-tile wide">
+                                    <div class="stile-label">🧬 Predicted ADME properties <span style="font-weight:400;">(ML — structure-based estimates)</span></div>
+                                    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;">
+                                        ${s.ml_adme.map(a => `<span title="R² ${a.r2} · ${a.key}" style="padding:4px 9px;border-radius:8px;font-size:.8rem;font-weight:600;background:#f8fafc;color:#334155;border:1px solid var(--border);">${a.label}: ${a.value}${a.unit ? ' ' + a.unit : ''}</span>`).join('')}
+                                    </div>
+                                </div>` : ''}
                                 ${s.clinical_trials && s.clinical_trials.total ? `
                                 <div class="summary-tile wide">
                                     <div class="stile-label">🧪 Clinical trials <span style="font-weight:400;">(ClinicalTrials.gov)</span></div>

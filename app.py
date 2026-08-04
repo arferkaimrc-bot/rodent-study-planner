@@ -130,6 +130,10 @@ class Config:
     # Extend this list as more <key>_model.pkl are trained (train_flags_models.py).
     ML_FLAG_KEYS = ['herg', 'dili', 'ames', 'bbb',
                     'cyp3a4', 'cyp2d6', 'cyp2c9', 'bioavail']
+
+    # ADME regression models (value predictions). Clearance (R2~0.18) is
+    # intentionally excluded as too weak to be informative.
+    ML_ADME_KEYS = ['lipophilicity', 'caco2', 'ppbr']
     
     # Toxicity prediction settings
     TOXICITY_CONFIDENCE_THRESHOLD = 60  # Minimum confidence to trust predictions
@@ -467,6 +471,19 @@ class ToxicityPredictor:
                 logger.error(f"Failed to load flag model {key}: {e}")
         if self.flag_models:
             logger.info(f"Loaded {len(self.flag_models)} ML flag models: {list(self.flag_models)}")
+        # ADME regression models (Lipophilicity, Caco-2, PPBR, …)
+        self.adme_models = {}   # key -> (model, meta)
+        for key in Config.ML_ADME_KEYS:
+            try:
+                mpath = os.path.join(Config.ML_MODEL_PATH, f'{key}_model.pkl')
+                jpath = os.path.join(Config.ML_MODEL_PATH, f'{key}_meta.json')
+                if os.path.exists(mpath):
+                    meta = json.load(open(jpath)) if os.path.exists(jpath) else {}
+                    self.adme_models[key] = (joblib.load(mpath), meta)
+            except Exception as e:
+                logger.error(f"Failed to load ADME model {key}: {e}")
+        if self.adme_models:
+            logger.info(f"Loaded {len(self.adme_models)} ML ADME models: {list(self.adme_models)}")
         logger.info("ToxicityPredictor initialized")
     
     def get_chemical_structure(self, drug_name):
@@ -741,6 +758,32 @@ class ToxicityPredictor:
                 'meaning': meta.get('positive_meaning', ''),
                 'auc': round(meta.get('test_auc', 0.75), 2),
                 'source': meta.get('source', ''),
+            })
+        return out
+
+    def predict_adme_ml(self, smiles, feats=None):
+        """Run every loaded ADME regression model on a SMILES (featurized once /
+        `feats` reused). Returns a list of {label, value, unit, r2} or []."""
+        if not self.adme_models:
+            return []
+        shared = feats if feats is not None else self._featurize_smiles(smiles)
+        if shared is None:
+            return []
+        X, _mw = shared
+        out = []
+        for key, (model, meta) in self.adme_models.items():
+            try:
+                p = float(model.predict(X)[0])
+            except Exception as e:
+                logger.error(f"ADME model {key} prediction failed: {e}")
+                continue
+            val = 10 ** p if meta.get('log') else p
+            out.append({
+                'key': key,
+                'label': meta.get('label', key),
+                'value': round(val, 2),
+                'unit': meta.get('unit', ''),
+                'r2': round(meta.get('test_r2', 0.5), 2),
             })
         return out
 
@@ -3595,6 +3638,7 @@ def get_prediction_and_suggestion(group, all_groups_count=1):
         solubility = None
         halflife = None
         ml_flags = []
+        ml_adme = []
         if not is_control:
             try:
                 _struct = toxicity_predictor.get_chemical_structure(drug)
@@ -3604,6 +3648,7 @@ def get_prediction_and_suggestion(group, all_groups_count=1):
                     solubility = toxicity_predictor.predict_solubility_ml(_smi, _feats)
                     halflife = toxicity_predictor.predict_halflife_ml(_smi, _feats)
                     ml_flags = toxicity_predictor.predict_flags_ml(_smi, _feats)
+                    ml_adme = toxicity_predictor.predict_adme_ml(_smi, _feats)
             except Exception as e:
                 logger.warning(f"ML property prediction failed for {drug}: {e}")
 
@@ -3657,6 +3702,7 @@ def get_prediction_and_suggestion(group, all_groups_count=1):
             'halflife': halflife,           # ML half-life estimate (human PK; frequency hint)
             'safe_dose': safe_dose,         # LD50-derived safer-dosing guidance (safety margin)
             'ml_flags': ml_flags,           # ML safety/ADME classifier flags (hERG, DILI, Ames, BBB)
+            'ml_adme': ml_adme,             # ML ADME regression values (LogD, Caco-2, PPBR)
             'clinical_trials': clinical_trials,  # ClinicalTrials.gov context (free)
             'timeline': build_protocol_timeline(group, animal_word),
             'welfare': welfare,

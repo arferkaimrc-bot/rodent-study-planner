@@ -1,0 +1,23 @@
+{
+  "key": "caco2",
+  "task": "regression",
+  "label": "Caco-2 permeability",
+  "unit": "log Papp",
+  "log": false,
+  "descriptor_names": [
+    "molecular_weight",
+    "logp",
+    "h_donors",
+    "h_acceptors",
+    "rotatable_bonds",
+    "aromatic_rings",
+    "tpsa"
+  ],
+  "fp_bits": 256,
+  "fp_radius": 2,
+  "n_train": 773,
+  "n_test": 137,
+  "test_mae": 0.30430025719783227,
+  "test_r2": 0.7423505454287828,
+  "source": "TDC Caco2_Wang"
+}

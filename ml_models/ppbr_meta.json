@@ -1,0 +1,23 @@
+{
+  "key": "ppbr",
+  "task": "regression",
+  "label": "Plasma protein binding",
+  "unit": "%",
+  "log": false,
+  "descriptor_names": [
+    "molecular_weight",
+    "logp",
+    "h_donors",
+    "h_acceptors",
+    "rotatable_bonds",
+    "aromatic_rings",
+    "tpsa"
+  ],
+  "fp_bits": 256,
+  "fp_radius": 2,
+  "n_train": 1371,
+  "n_test": 243,
+  "test_mae": 7.8421760966327945,
+  "test_r2": 0.4146661758057707,
+  "source": "TDC PPBR_AZ"
+}
