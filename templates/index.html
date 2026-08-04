@@ -1556,6 +1556,9 @@
                                     { icon:'🔥', name:'Inflammation', items:['TNF-α','IL-6','IL-1β','CRP'] },
                                     { icon:'🧬', name:'Molecular', items:['Western blot','ELISA','qPCR'] },
                                     { icon:'🦠', name:'Vaccines / Infection', items:['Virus titer','Chronic infection','Recovery','Death'] },
+                                    { icon:'🧠', name:'Behavioral / Neuroscience', items:['Open field','Rotarod','Morris water maze','Elevated plus maze','Forced swim','Grip strength','Von Frey (pain)'] },
+                                    { icon:'🎗️', name:'Oncology / Tumor', items:['Tumor volume','Tumor weight','Survival (Kaplan–Meier)','Metastasis count','Ki-67'] },
+                                    { icon:'⚖️', name:'General / Clinical', items:['Body weight','Food & water intake','Body temperature','Body condition score','Survival / mortality'] },
                                 ];
                                 const chosen = data?.toxicity_endpoints || [];
                                 return OUTCOME_CATEGORIES.map(cat => `
