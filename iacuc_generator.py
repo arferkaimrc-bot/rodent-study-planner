@@ -179,7 +179,15 @@ def _what_done(rows):
             drug = _s(g.get("drug_name"), "the test article")
             dose = _s(g.get("dose"))
             dose_txt = f" at {dose} mg/kg" if dose else ""
-            lines.append(f"• {gname}: {n} {sp} receive {drug}{dose_txt} by {route_txt}.")
+            veh = _s(g.get("vehicle"))
+            vol = _s(g.get("vehicle_volume"))
+            if veh and vol:
+                veh_txt = f" in {veh} ({vol})"
+            elif veh:
+                veh_txt = f" in {veh}"
+            else:
+                veh_txt = ""
+            lines.append(f"• {gname}: {n} {sp} receive {drug}{dose_txt}{veh_txt} by {route_txt}.")
     lines.append("All animals are weighed and observed regularly for clinical signs; biological "
                  "samples are collected at defined time-points, after which animals are humanely "
                  "euthanised and tissues collected.")
@@ -393,8 +401,16 @@ def _procedures_overview(rows, acclim_days="", methods="", duration=""):
         route_txt = route if ("route" in route.lower() or "(" in route) else f"the {route} route"
         dose = _s(g.get("dose"))
         dose_txt = f" at {dose} mg/kg" if dose else ""
+        veh = _s(g.get("vehicle"))
+        vol = _s(g.get("vehicle_volume"))
+        if veh and vol:
+            veh_txt = f" in {veh} ({vol})"
+        elif veh:
+            veh_txt = f" in {veh}"
+        else:
+            veh_txt = ""
         lines.append(f"{n}. Dosing ({_s(g.get('group_name'), 'group')}): administration of "
-                     f"{drug}{dose_txt} by {route_txt}.")
+                     f"{drug}{dose_txt}{veh_txt} by {route_txt}.")
         n += 1
     lines.append(f"{n}. Monitoring: regular body-weight measurement and structured clinical "
                  "observation for signs of toxicity against predefined humane endpoints.")
