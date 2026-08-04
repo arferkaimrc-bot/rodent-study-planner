@@ -1,0 +1,21 @@
+{
+  "key": "cyp2c9",
+  "task": "classification",
+  "label": "CYP2C9 inhibition",
+  "positive_meaning": "inhibits CYP2C9 (drug-interaction risk)",
+  "descriptor_names": [
+    "molecular_weight",
+    "logp",
+    "h_donors",
+    "h_acceptors",
+    "rotatable_bonds",
+    "aromatic_rings",
+    "tpsa"
+  ],
+  "fp_bits": 256,
+  "fp_radius": 2,
+  "n_train": 10278,
+  "n_test": 1814,
+  "test_auc": 0.8626709379252548,
+  "source": "TDC CYP2C9_Veith"
+}

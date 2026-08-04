@@ -37,6 +37,14 @@ CONFIGS = [
      'mutagenic (Ames positive)', 'TDC AMES (Xu et al.)'),
     ('bbb', 'ADME', 'BBB_Martins', 'Blood-brain barrier',
      'able to cross the blood-brain barrier', 'TDC BBB_Martins'),
+    ('cyp3a4', 'ADME', 'CYP3A4_Veith', 'CYP3A4 inhibition',
+     'inhibits CYP3A4 (drug-interaction risk)', 'TDC CYP3A4_Veith'),
+    ('cyp2d6', 'ADME', 'CYP2D6_Veith', 'CYP2D6 inhibition',
+     'inhibits CYP2D6 (drug-interaction risk)', 'TDC CYP2D6_Veith'),
+    ('cyp2c9', 'ADME', 'CYP2C9_Veith', 'CYP2C9 inhibition',
+     'inhibits CYP2C9 (drug-interaction risk)', 'TDC CYP2C9_Veith'),
+    ('bioavail', 'ADME', 'Bioavailability_Ma', 'Oral bioavailability',
+     'orally bioavailable (≥ 20%)', 'TDC Bioavailability_Ma'),
 ]
 
 

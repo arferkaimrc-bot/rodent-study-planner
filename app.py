@@ -128,7 +128,8 @@ class Config:
 
     # Batch of binary safety/ADME classifiers (loaded generically from ml_models/).
     # Extend this list as more <key>_model.pkl are trained (train_flags_models.py).
-    ML_FLAG_KEYS = ['herg', 'dili', 'ames', 'bbb']
+    ML_FLAG_KEYS = ['herg', 'dili', 'ames', 'bbb',
+                    'cyp3a4', 'cyp2d6', 'cyp2c9', 'bioavail']
     
     # Toxicity prediction settings
     TOXICITY_CONFIDENCE_THRESHOLD = 60  # Minimum confidence to trust predictions
@@ -637,12 +638,13 @@ class ToxicityPredictor:
             return 'low', ('Poorly water-soluble — consider DMSO / cyclodextrin / a cosolvent '
                            'system, a nanosuspension, or a salt form.')
 
-    def predict_solubility_ml(self, smiles):
+    def predict_solubility_ml(self, smiles, feats=None):
         """Predict aqueous solubility (logS) with the trained model. Returns a
-        dict {logS, mg_per_mL, category, vehicle_hint, confidence, source} or None."""
+        dict {logS, mg_per_mL, category, vehicle_hint, confidence, source} or None.
+        `feats` (from a shared featurization) is reused if provided."""
         if self.solubility_model is None:
             return None
-        feats = self._featurize_smiles(smiles, self.solubility_meta)
+        feats = feats if feats is not None else self._featurize_smiles(smiles, self.solubility_meta)
         if feats is None:
             return None
         X, mw = feats
@@ -676,13 +678,14 @@ class ToxicityPredictor:
         else:
             return 'long', 'Long half-life — once daily (or less frequent) dosing may suffice.'
 
-    def predict_halflife_ml(self, smiles):
+    def predict_halflife_ml(self, smiles, feats=None):
         """Predict plasma half-life with the trained model. NOTE: trained on HUMAN
         data (Obach) and is a modest model — used as a *relative* indicator for
-        dosing frequency, not an absolute rodent value. Returns dict or None."""
+        dosing frequency, not an absolute rodent value. Returns dict or None.
+        `feats` (from a shared featurization) is reused if provided."""
         if self.halflife_model is None:
             return None
-        feats = self._featurize_smiles(smiles, self.halflife_meta)
+        feats = feats if feats is not None else self._featurize_smiles(smiles, self.halflife_meta)
         if feats is None:
             return None
         X, _mw = feats
@@ -707,20 +710,23 @@ class ToxicityPredictor:
         }
 
     # Which flag keys are safety RISKS (high probability = concern) vs neutral
-    # structural properties (e.g. BBB penetration is informative, not a risk).
-    _RISK_FLAG_KEYS = {'herg', 'dili', 'ames'}
+    # structural properties (e.g. BBB penetration / bioavailability are
+    # informative, not risks).
+    _RISK_FLAG_KEYS = {'herg', 'dili', 'ames', 'cyp3a4', 'cyp2d6', 'cyp2c9'}
 
-    def predict_flags_ml(self, smiles):
+    def predict_flags_ml(self, smiles, feats=None):
         """Run every loaded binary safety/ADME classifier on a SMILES.
-        Returns a list of flag dicts (probability of the positive class) or []."""
+        All classifiers share one feature layout, so the molecule is featurized
+        ONCE (or `feats` is reused) — keeps this O(1) in RDKit work as the model
+        registry grows. Returns a list of flag dicts or []."""
         if not self.flag_models:
             return []
+        shared = feats if feats is not None else self._featurize_smiles(smiles)
+        if shared is None:
+            return []
+        X, _mw = shared
         out = []
         for key, (model, meta) in self.flag_models.items():
-            feats = self._featurize_smiles(smiles, meta)
-            if feats is None:
-                continue
-            X, _mw = feats
             try:
                 p = float(model.predict_proba(X)[0][1])
             except Exception as e:
@@ -3013,6 +3019,50 @@ def search_preprints(group, max_results=6):
         return []
 
 
+def search_clinical_trials(drug, max_results=3, timeout=4):
+    """ClinicalTrials.gov (free, no API key) — trials for a given drug.
+
+    Uses a STRICT short timeout and swallows every error so it can never hang or
+    break the results. Returns {total, studies:[...]} or None on any failure.
+    """
+    drug = (drug or "").strip()
+    if not drug:
+        return None
+    cache_key = {'drug': drug.lower(), 'max': max_results}
+    cached = api_cache.get('clinicaltrials', cache_key)
+    if cached is not None:
+        return cached
+    try:
+        r = requests.get(
+            "https://clinicaltrials.gov/api/v2/studies",
+            params={'query.intr': drug, 'countTotal': 'true', 'pageSize': max_results,
+                    'fields': 'NCTId,BriefTitle,OverallStatus,Phase'},
+            timeout=timeout)
+        if r.status_code != 200:
+            return {'total': 0, 'studies': []}
+        data = r.json()
+        studies = []
+        for s in (data.get('studies') or [])[:max_results]:
+            p = s.get('protocolSection', {}) or {}
+            idm = p.get('identificationModule', {}) or {}
+            stat = p.get('statusModule', {}) or {}
+            des = p.get('designModule', {}) or {}
+            nct = idm.get('nctId', '')
+            studies.append({
+                'nct': nct,
+                'title': idm.get('briefTitle', ''),
+                'status': stat.get('overallStatus', ''),
+                'phase': ', '.join(des.get('phases', []) or []),
+                'url': f"https://clinicaltrials.gov/study/{nct}" if nct else '',
+            })
+        result = {'total': int(data.get('totalCount', 0) or 0), 'studies': studies}
+        api_cache.set('clinicaltrials', cache_key, result)
+        return result
+    except Exception as e:
+        logger.warning(f"ClinicalTrials.gov lookup failed/timed out for {drug}: {e}")
+        return None
+
+
 def search_impc(group, max_results=3):
     """Search IMPC for strain phenotype data."""
     strain = group.get('strain', '').replace('/', '%2F')
@@ -3517,6 +3567,10 @@ def get_prediction_and_suggestion(group, all_groups_count=1):
             except Exception as e:
                 logger.warning(f"Compound overview failed for {drug}: {e}")
 
+        # ClinicalTrials.gov context (free, no key; strict 4s timeout — the
+        # function swallows any error/timeout, so results never hang). Controls skipped.
+        clinical_trials = search_clinical_trials(drug) if not is_control else None
+
         # Recommended strain by experimental paradigm (common choices in the
         # literature) — a suggestion the researcher can override.
         _paradigm = (group.get('experiment_type') or '').lower()
@@ -3546,9 +3600,10 @@ def get_prediction_and_suggestion(group, all_groups_count=1):
                 _struct = toxicity_predictor.get_chemical_structure(drug)
                 if _struct.get('success'):
                     _smi = _struct['smiles']
-                    solubility = toxicity_predictor.predict_solubility_ml(_smi)
-                    halflife = toxicity_predictor.predict_halflife_ml(_smi)
-                    ml_flags = toxicity_predictor.predict_flags_ml(_smi)
+                    _feats = toxicity_predictor._featurize_smiles(_smi)   # once, shared
+                    solubility = toxicity_predictor.predict_solubility_ml(_smi, _feats)
+                    halflife = toxicity_predictor.predict_halflife_ml(_smi, _feats)
+                    ml_flags = toxicity_predictor.predict_flags_ml(_smi, _feats)
             except Exception as e:
                 logger.warning(f"ML property prediction failed for {drug}: {e}")
 
@@ -3602,6 +3657,7 @@ def get_prediction_and_suggestion(group, all_groups_count=1):
             'halflife': halflife,           # ML half-life estimate (human PK; frequency hint)
             'safe_dose': safe_dose,         # LD50-derived safer-dosing guidance (safety margin)
             'ml_flags': ml_flags,           # ML safety/ADME classifier flags (hERG, DILI, Ames, BBB)
+            'clinical_trials': clinical_trials,  # ClinicalTrials.gov context (free)
             'timeline': build_protocol_timeline(group, animal_word),
             'welfare': welfare,
             'biological_advice': biological_advice_for(species, group),

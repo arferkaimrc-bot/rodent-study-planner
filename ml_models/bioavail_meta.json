@@ -1,0 +1,21 @@
+{
+  "key": "bioavail",
+  "task": "classification",
+  "label": "Oral bioavailability",
+  "positive_meaning": "orally bioavailable (\u2265 20%)",
+  "descriptor_names": [
+    "molecular_weight",
+    "logp",
+    "h_donors",
+    "h_acceptors",
+    "rotatable_bonds",
+    "aromatic_rings",
+    "tpsa"
+  ],
+  "fp_bits": 256,
+  "fp_radius": 2,
+  "n_train": 544,
+  "n_test": 96,
+  "test_auc": 0.6996314496314496,
+  "source": "TDC Bioavailability_Ma"
+}

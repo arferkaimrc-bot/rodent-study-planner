@@ -1,0 +1,21 @@
+{
+  "key": "cyp3a4",
+  "task": "classification",
+  "label": "CYP3A4 inhibition",
+  "positive_meaning": "inhibits CYP3A4 (drug-interaction risk)",
+  "descriptor_names": [
+    "molecular_weight",
+    "logp",
+    "h_donors",
+    "h_acceptors",
+    "rotatable_bonds",
+    "aromatic_rings",
+    "tpsa"
+  ],
+  "fp_bits": 256,
+  "fp_radius": 2,
+  "n_train": 10478,
+  "n_test": 1850,
+  "test_auc": 0.8673201221677675,
+  "source": "TDC CYP3A4_Veith"
+}
