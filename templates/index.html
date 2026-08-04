@@ -1776,6 +1776,8 @@
                     group_name: groupEl.querySelector('.group-name').value,
                     drug_name: groupEl.querySelector('.drug-name').value,
                     dose: groupEl.querySelector('.dose').value,
+                    vehicle: (groupEl.querySelector('.vehicle')?.value || '').trim(),
+                    vehicle_volume: (groupEl.querySelector('.vehicle-volume')?.value || '').trim(),
                     species: groupEl.querySelector('.species')?.value || 'Mouse',
                     strain: strainValue,
                     sex: groupEl.querySelector('.sex').value,

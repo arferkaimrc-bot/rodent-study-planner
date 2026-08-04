@@ -165,7 +165,15 @@ def _what_done(rows):
         route = _s(g.get("route"), "the assigned route")
         route_txt = route if ("route" in route.lower() or "(" in route) else f"the {route} route"
         if _is_control(g):
-            lines.append(f"• {gname}: {n} {sp} receive the vehicle/control by {route_txt}, "
+            veh = _s(g.get("vehicle"))
+            vol = _s(g.get("vehicle_volume"))
+            if veh and vol:
+                veh_txt = f"the vehicle ({veh}, {vol})"
+            elif veh:
+                veh_txt = f"the vehicle ({veh})"
+            else:
+                veh_txt = "the vehicle/control"
+            lines.append(f"• {gname}: {n} {sp} receive {veh_txt} by {route_txt}, "
                          f"handled identically to the treatment group(s).")
         else:
             drug = _s(g.get("drug_name"), "the test article")
