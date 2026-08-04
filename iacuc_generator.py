@@ -416,6 +416,62 @@ def _research_aims(rows):
     return "\n".join(f"{i}. {a}" for i, a in enumerate(aims, 1))
 
 
+def _analgesia_sentence(rows):
+    """PART 11 — analgesia regimen(s) supplied by the researcher (or '')."""
+    items = []
+    for g, _, _ in rows:
+        drug = _s(g.get("analgesia_drug"))
+        if not drug:
+            continue
+        parts = [drug]
+        if _s(g.get("analgesia_dose")):
+            parts.append("at " + _s(g.get("analgesia_dose")))
+        if _s(g.get("analgesia_frequency")):
+            parts.append(_s(g.get("analgesia_frequency")))
+        if _s(g.get("analgesia_duration")):
+            parts.append("for " + _s(g.get("analgesia_duration")))
+        items.append(" ".join(parts))
+    items = _join_unique(items)
+    if not items:
+        return ""
+    return "Analgesia (per veterinary approval): " + "; ".join(items) + "."
+
+
+def _sample_handling_detail(rows):
+    """Researcher sample-collection / handling detail as 'a: x; b: y' (or '')."""
+    timing, tubes, methods, freqs, amounts, preserv = [], [], [], [], [], []
+    for g, _, _ in rows:
+        sc = g.get("sample_collection")
+        if not isinstance(sc, dict):
+            continue
+        if _s(sc.get("timing")):
+            timing.append(_s(sc.get("timing")))
+        for key, bucket in (("tube", tubes), ("method", methods),
+                            ("frequency", freqs), ("amount", amounts)):
+            if _s(sc.get(key)):
+                bucket.append(_s(sc.get(key)))
+        for p in (sc.get("preservation") or []):
+            if _s(p):
+                preserv.append(_s(p))
+        po = _s(sc.get("preservation_other"))
+        if po and po.lower() != "other":
+            preserv.append(po)
+    bits = []
+    if timing:
+        bits.append("timing: " + _list_sentence(timing))
+    if freqs:
+        bits.append("frequency: " + _list_sentence(freqs))
+    if amounts:
+        bits.append("volume/weight: " + _list_sentence(amounts))
+    if tubes:
+        bits.append("collection tubes: " + _list_sentence(tubes))
+    if preserv:
+        bits.append("preservation: " + _list_sentence(preserv))
+    if methods:
+        bits.append("method: " + _list_sentence(methods))
+    return "; ".join(bits)
+
+
 def _procedures_overview(rows, acclim_days="", methods="", duration=""):
     """PART 6 overview — a clean, professional list of the manipulations, then
     the researcher's optional free-text methods, then a representative timeline."""
@@ -451,9 +507,14 @@ def _procedures_overview(rows, acclim_days="", methods="", duration=""):
                  "observation for signs of toxicity against predefined humane endpoints.")
     n += 1
     samples = _join_unique(x for _, _, s in rows for x in (s.get("recommended_samples") or []))
+    handling = _sample_handling_detail(rows)
     if samples:
+        extra = f" Handling — {handling}." if handling else ""
         lines.append(f"{n}. Sample collection: {_list_sentence(samples)}, collected within safe "
-                     "volume limits at defined time-points.")
+                     f"volume limits at defined time-points.{extra}")
+        n += 1
+    elif handling:
+        lines.append(f"{n}. Sample collection & handling — {handling}.")
         n += 1
     lines.append(f"{n}. Termination: humane euthanasia and terminal tissue collection at the "
                  "study endpoint (see Part 8).")
@@ -587,6 +648,9 @@ def _discomfort_measures(rows):
             "soft/moist food and supplemental warmth as needed, and prompt clinical intervention.")
     if w and w.get("monitoring", {}).get("analgesia_guidance"):
         base += " " + _s(w["monitoring"]["analgesia_guidance"])
+    ana = _analgesia_sentence(rows)
+    if ana:
+        base += " " + ana
     return base
 
 

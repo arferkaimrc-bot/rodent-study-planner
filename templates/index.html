@@ -1433,6 +1433,28 @@
                                    style="margin-top:8px; display:${data?.welfare_other ? 'block' : 'none'};">
                         </div>
 
+                        <div class="form-group" style="grid-column: 1 / -1;">
+                            <label>💊 Analgesia <span style="font-weight:400;color:var(--muted);font-size:.85rem;">(if requested — per veterinary approval → IACUC Part 11)</span></label>
+                            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;">
+                                <div class="form-group">
+                                    <label>Analgesic drug:</label>
+                                    <input type="text" class="analgesia-drug" placeholder="e.g., Buprenorphine" value="${data?.analgesia_drug || ''}">
+                                </div>
+                                <div class="form-group">
+                                    <label>Dose:</label>
+                                    <input type="text" class="analgesia-dose" placeholder="e.g., 0.05 mg/kg" value="${data?.analgesia_dose || ''}">
+                                </div>
+                                <div class="form-group">
+                                    <label>Frequency:</label>
+                                    <input type="text" class="analgesia-frequency" placeholder="e.g., every 12 h" value="${data?.analgesia_frequency || ''}">
+                                </div>
+                                <div class="form-group">
+                                    <label>Duration:</label>
+                                    <input type="text" class="analgesia-duration" placeholder="e.g., 48–72 h post-procedure" value="${data?.analgesia_duration || ''}">
+                                </div>
+                            </div>
+                        </div>
+
                         <div class="form-group">
                             <label>Species:</label>
                             <input type="hidden" class="species" value="${data?.species || 'Mouse'}">
@@ -1586,6 +1608,55 @@
                         <div class="form-group sample-types-container">
                             <label>Biological Sample Types to Collect:</label>
                             <div class="sample-types-grid"></div>
+                        </div>
+
+                        <div class="form-group" style="grid-column: 1 / -1;">
+                            <label>🧪 Sample Collection & Handling <span style="font-weight:400;color:var(--muted);font-size:.85rem;">(optional — specific requests)</span></label>
+                            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:10px;">
+                                <div class="form-group">
+                                    <label>Collection timing:</label>
+                                    <select class="collection-timing">
+                                        <option value="" ${!data?.sample_collection?.timing ? 'selected' : ''}>—</option>
+                                        ${['Terminal','Non-terminal','Both'].map(o => `<option ${data?.sample_collection?.timing === o ? 'selected' : ''}>${o}</option>`).join('')}
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Tube type:</label>
+                                    <input type="text" class="collection-tube" placeholder="e.g., EDTA, serum-separator, cryovial" value="${data?.sample_collection?.tube || ''}">
+                                </div>
+                                <div class="form-group">
+                                    <label>Frequency:</label>
+                                    <input type="text" class="collection-frequency" placeholder="e.g., weekly / terminal only" value="${data?.sample_collection?.frequency || ''}">
+                                </div>
+                                <div class="form-group">
+                                    <label>Volume / tissue weight:</label>
+                                    <input type="text" class="collection-amount" placeholder="e.g., 100 µL / ~50 mg" value="${data?.sample_collection?.amount || ''}">
+                                </div>
+                                <div class="form-group">
+                                    <label>Method / notes:</label>
+                                    <input type="text" class="collection-method" placeholder="e.g., cardiac puncture; kept on ice" value="${data?.sample_collection?.method || ''}">
+                                </div>
+                            </div>
+                            <label style="font-size:.85rem;color:var(--muted);">Preservation / fixation:</label>
+                            <div class="tox-endpoints-grid" style="margin-top:6px;">
+                                ${(() => {
+                                    const opts = ['Snap-freeze','RNAlater','Liquid nitrogen','Formalin-fixed (FFPE)','On ice / fresh'];
+                                    const sel = data?.sample_collection?.preservation || [];
+                                    return opts.map(o => `
+                                        <label class="tox-endpoint">
+                                            <input type="checkbox" class="preservation-cb" value="${o}" ${sel.includes(o) ? 'checked' : ''}>
+                                            <span>${o}</span>
+                                        </label>`).join('');
+                                })()}
+                                <label class="tox-endpoint">
+                                    <input type="checkbox" class="preservation-other-cb" ${data?.sample_collection?.preservation_other ? 'checked' : ''}
+                                           onchange="this.closest('.form-group').querySelector('.preservation-other-input').style.display=this.checked?'block':'none'">
+                                    <span>Other</span>
+                                </label>
+                            </div>
+                            <input type="text" class="preservation-other-input" placeholder="Specify other preservation / handling…"
+                                   value="${data?.sample_collection?.preservation_other || ''}"
+                                   style="margin-top:8px; display:${data?.sample_collection?.preservation_other ? 'block' : 'none'};">
                         </div>
 
                         <!-- Blood Quantity Calculator -->
@@ -1894,7 +1965,20 @@
                     disease_model: (groupEl.querySelector('.disease-model')?.value || '').trim(),
                     success_criteria: (groupEl.querySelector('.success-criteria')?.value || '').trim(),
                     welfare_monitoring: Array.from(groupEl.querySelectorAll('.welfare-cb:checked')).map(cb => cb.value),
-                    welfare_other: (groupEl.querySelector('.welfare-other-cb')?.checked && (groupEl.querySelector('.welfare-other-input')?.value || '').trim()) || ''
+                    welfare_other: (groupEl.querySelector('.welfare-other-cb')?.checked && (groupEl.querySelector('.welfare-other-input')?.value || '').trim()) || '',
+                    analgesia_drug: (groupEl.querySelector('.analgesia-drug')?.value || '').trim(),
+                    analgesia_dose: (groupEl.querySelector('.analgesia-dose')?.value || '').trim(),
+                    analgesia_frequency: (groupEl.querySelector('.analgesia-frequency')?.value || '').trim(),
+                    analgesia_duration: (groupEl.querySelector('.analgesia-duration')?.value || '').trim(),
+                    sample_collection: {
+                        timing: (groupEl.querySelector('.collection-timing')?.value || '').trim(),
+                        tube: (groupEl.querySelector('.collection-tube')?.value || '').trim(),
+                        frequency: (groupEl.querySelector('.collection-frequency')?.value || '').trim(),
+                        amount: (groupEl.querySelector('.collection-amount')?.value || '').trim(),
+                        method: (groupEl.querySelector('.collection-method')?.value || '').trim(),
+                        preservation: Array.from(groupEl.querySelectorAll('.preservation-cb:checked')).map(cb => cb.value),
+                        preservation_other: (groupEl.querySelector('.preservation-other-cb')?.checked && (groupEl.querySelector('.preservation-other-input')?.value || '').trim()) || ''
+                    }
                 });
             });
             
