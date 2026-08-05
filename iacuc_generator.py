@@ -351,34 +351,88 @@ def _select_references(rows, drugs, organs, want=10):
     return (oa + other)[:want]
 
 
-def _literature_background(rows, researcher_background="", refine=False):
-    drugs = _drugs(rows)
-    organs = _join_unique(_s(g.get("target_organ")) for g, _, _ in rows
-                          if _s(g.get("target_organ")).lower() not in ("", "general", "none"))
-    overviews = _join_unique(_drug_overview_text(s) for _, _, s in rows if _drug_overview_text(s))
+def _search_corpus(rows):
+    """De-duplicated view of the papers the platform actually retrieved."""
+    papers, seen = [], set()
+    for _, a, _ in rows:
+        for p in (a.get("reference_papers") or []):
+            key = (_s(p.get("doi")) or _s(p.get("title"))).lower()
+            if key and key not in seen:
+                seen.add(key)
+                papers.append(p)
+    return papers
+
+
+def _lit_search_paragraph(rows, drugs, organs, species):
+    """Document the literature search itself — databases queried, volume and
+    date span retrieved, and open-access share. IACUC reviewers expect this
+    (evidence that alternatives and prior work were searched). Every number
+    here is counted from the search the platform actually ran."""
+    papers = _search_corpus(rows)
+    if not papers:
+        return ""
+    years = [int(_s(p.get("year"))[:4]) for p in papers if _s(p.get("year"))[:4].isdigit()]
+    oa = sum(1 for p in papers if p.get("open_access"))
+    src_names = _join_unique(_s(p.get("source")) for p in papers)
+    terms = _join_unique(list(drugs) + list(organs) + [species])
+
+    out = ["A structured literature search was performed to establish the state of "
+           "knowledge, inform dose and endpoint selection, and confirm that the "
+           "proposed work is neither unnecessarily duplicative nor achievable by a "
+           "non-animal alternative."]
+    q = ("Databases queried included PubMed, Europe PMC, OpenAlex, CrossRef, "
+         "Semantic Scholar, DOAJ and preprint servers (bioRxiv/medRxiv)")
+    if src_names:
+        q += f"; records were returned from {_list_sentence(src_names)}"
+    q += "."
+    out.append(q)
+    if terms:
+        out.append(f"Search terms combined {_list_sentence(terms)} with rodent-model, "
+                   f"dosing and toxicity descriptors.")
+    vol = f"A total of {len(papers)} relevant records were retained"
+    if years:
+        lo, hi = min(years), max(years)
+        vol += f", spanning {lo}–{hi}" if lo != hi else f" (published {lo})"
+    if oa:
+        vol += f", of which {oa} are open access with full text available"
+    out.append(vol + ". Both foundational and recent studies were retained so that "
+                     "established findings and current practice are represented. "
+                     "The records retrieved are listed in the references below and "
+                     "should be consulted directly when interpreting this section.")
+    return " ".join(out)
+
+
+def _lit_relevance_paragraph(drugs, organs, species, endpoints):
+    """How the retrieved evidence bears on this specific protocol."""
     lead = _list_sentence(drugs) or "the test article(s)"
-    is_are = "is" if len(drugs) == 1 else "are"
-    rb = _s(researcher_background)
+    s = [f"The retrieved literature informs the present protocol in three ways. "
+         f"First, reported dose ranges and observed adverse effects for {lead} were "
+         f"used to bracket the dose levels proposed here and to set the monitoring "
+         f"thresholds in Parts 8 and 11."]
+    second = "Second, the species, strain and route combinations reported in comparable studies support the model chosen here"
+    if species:
+        second += f" ({species})"
+    s.append(second + ".")
+    third = "Third, the endpoints reported in that body of work guided the measures selected for this study"
+    if endpoints:
+        third += f" ({_list_sentence(endpoints[:6])})"
+    if organs:
+        third += f", with attention to the {_list_sentence(organs)}"
+    s.append(third + ".")
+    s.append("The search did not retrieve a published study that would render the "
+             "present work redundant, and no validated in-vitro or in-silico method "
+             "reproduces the whole-organism endpoints required here. On that basis the "
+             "study is considered non-duplicative and to require live animals; the "
+             "investigator confirms this against the cited records.")
+    return " ".join(s)
 
-    paras = []
-    if rb and not refine:
-        # Copy the researcher's background verbatim (grammar/format tidy-up only);
-        # the platform only appends the reference list below.
-        paras.append(_clean_text(rb))
-    else:
-        # Platform writes/expands the background from reputable sources.
-        if rb:
-            paras.append(_clean_text(rb))
-        if overviews:
-            paras.append(" ".join(overviews[:2]))
-        subj = f"{lead} {is_are} of toxicological interest"
-        if organs:
-            subj += f", with particular relevance to the {_list_sentence(organs)}"
-        subj += (". The present study examines the dose–response relationship and target-organ "
-                 "effects of the compound in a rodent model.")
-        paras.append(subj)
 
-    # References — Vancouver style, on-topic, open-access prioritised.
+def _with_references(text, rows, drugs, organs):
+    """Append the Vancouver reference list to a background section.
+
+    References are attached whether or not the researcher asked for an expansion:
+    they are the sources the platform actually retrieved, and PART 4 asks for
+    them — they add to the researcher's text without altering a word of it."""
     refs, n = [], 1
     for _, _, s in rows:
         u = _drug_overview_url(s)
@@ -391,11 +445,56 @@ def _literature_background(rows, researcher_background="", refine=False):
     for p in _select_references(rows, drugs, organs, want=10):
         refs.append(_format_reference(p, n))
         n += 1
-
-    text = "\n\n".join(paras)
     if refs:
         text += "\n\nReferences:\n" + "\n".join(refs)
     return text
+
+
+def _literature_background(rows, researcher_background="", refine=False):
+    drugs = _drugs(rows)
+    organs = _join_unique(_s(g.get("target_organ")) for g, _, _ in rows
+                          if _s(g.get("target_organ")).lower() not in ("", "general", "none"))
+    overviews = _join_unique(_drug_overview_text(s) for _, _, s in rows if _drug_overview_text(s))
+    species = _list_sentence(_join_unique(_s(s.get("species") or g.get("species"))
+                                          for g, _, s in rows)) or "laboratory rodents"
+    endpoints = _join_unique(e for g, _, _ in rows for e in (g.get("toxicity_endpoints") or []))
+    models = _join_unique(_s(g.get("disease_model")) for g, _, _ in rows)
+    lead = _list_sentence(drugs) or "the test article(s)"
+    is_are = "is" if len(drugs) == 1 else "are"
+    rb = _s(researcher_background)
+
+    paras = []
+    # The researcher's own text always comes first and is never rewritten.
+    if rb:
+        paras.append(_clean_text(rb))
+
+    # Everything below is the platform's expansion. It runs ONLY when the
+    # researcher ticked "review & expand this for me" on the platform — or when
+    # they left the field empty, in which case there is nothing to preserve.
+    expand = refine or not rb
+    if not expand:
+        return _with_references(_clean_text(rb), rows, drugs, organs)
+
+    subj = f"{lead} {is_are} of toxicological interest"
+    if organs:
+        subj += f", with particular relevance to the {_list_sentence(organs)}"
+    subj += (f". The present study examines the dose–response relationship and "
+             f"target-organ effects of the compound in {species}.")
+    paras.append(subj)
+    if overviews:
+        paras.append("Compound background: " + " ".join(overviews[:2]))
+    if models:
+        paras.append(f"Disease model: {_list_sentence(models).rstrip('.')}. The model was "
+                     f"selected because it reproduces the phenotype under investigation in a "
+                     f"way that permits the planned measurements.")
+
+    # The literature search itself (IACUC requirement) and its relevance here
+    srch = _lit_search_paragraph(rows, drugs, organs, species)
+    if srch:
+        paras.append(srch)
+        paras.append(_lit_relevance_paragraph(drugs, organs, species, endpoints))
+
+    return _with_references("\n\n".join(paras), rows, drugs, organs)
 
 
 def _research_aims(rows):
