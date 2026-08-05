@@ -1012,6 +1012,22 @@ def _fill_struct_row(row, values):
             _set_tc_clean(tcs[ci], v)
 
 
+def _clear_unused_rows(table, first_data_row, n_used):
+    """Blank the spare rows of a structured table we only partially filled.
+
+    The blank template rows carry 'Click here to enter text.' content controls;
+    left as-is they make a filled form look half-finished. Rows that already
+    hold researcher text are never touched."""
+    try:
+        for r in range(first_data_row + n_used, len(table.rows)):
+            for tc in _ordered_unwrapped_tcs(table.rows[r]._tr):
+                txt = ''.join(t.text or '' for t in tc.iter(qn('w:t'))).strip()
+                if (not txt) or txt.strip('. ') == '' or 'click' in txt.lower() or 'choose an item' in txt.lower():
+                    _set_tc_clean(tc, '')
+    except Exception:
+        pass
+
+
 def _write_cell(cell, text):
     """Write text into a cell — into its plain-text content control if it has
     one (handling both paragraph and inline controls, so the 'Click here to
@@ -1137,6 +1153,9 @@ def fill_form_controls(doc, rows, admin, study):
                               an['age'], an['total'], an['source']])
         except Exception:
             pass
+    # blank the spare template rows so the filled form doesn't look half-finished
+    _clear_unused_rows(T[2], 1, len(team[:6]))
+    _clear_unused_rows(T[10], 1, len(animals[:6]))
 
     # ── PART 1 B — personnel × procedures matrix (T3) ─────────────────────
     species_all = _list_sentence(_join_unique(
@@ -1158,6 +1177,7 @@ def fill_form_controls(doc, rows, admin, study):
                              [m['name'], '', m['qualifications'], species_all] + proc)
         except Exception:
             pass
+    _clear_unused_rows(T[3], 4, len(team[:6]))
 
     # "Describe any other procedure not listed …" box (T4)
     _route = _list_sentence(_join_unique(
@@ -1225,6 +1245,7 @@ def fill_form_controls(doc, rows, admin, study):
         row(24, 1 + i, [_s(g.get('group_name'), f'Group {i + 1}'),
                         _s(s.get('species') or g.get('species'), 'Mouse'),
                         _s(s.get('planned_animals') or g.get('num_mice'))])
+    _clear_unused_rows(T[24], 1, len(rows))
     cbr(25, 2, 0)                                # "determined statistically"
     row(25, 3, [None, _reduce_text(rows, (study or {}).get('design'))])   # description
 
