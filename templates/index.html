@@ -1365,6 +1365,19 @@
                             <label>Drug Name: <span style="color: var(--danger);">*</span></label>
                             <input type="text" class="drug-name" value="${drugName}" placeholder="e.g., Ibuprofen — or pick a suggestion below" required>
                             <div class="drug-suggestions" style="margin-top:6px;display:flex;flex-wrap:wrap;gap:5px;"></div>
+                            <label class="refine-check" style="margin-top:8px;">
+                                <input type="checkbox" class="confidential-cb" ${data?.confidential ? 'checked' : ''}
+                                       onchange="this.closest('.form-group').querySelector('.confidential-fields').style.display=this.checked?'block':'none'">
+                                <span>🔒 My compound is confidential / unpublished — keep its name inside the platform (no external lookup by name).</span>
+                            </label>
+                            <div class="confidential-fields" style="display:${data?.confidential ? 'block' : 'none'};margin-top:8px;">
+                                <label style="font-size:.85rem;">Chemical structure (SMILES) — required for predictions:</label>
+                                <input type="text" class="compound-smiles" placeholder="e.g., CC(=O)Oc1ccccc1C(=O)O"
+                                       value="${data?.smiles || ''}">
+                                <label style="font-size:.85rem;margin-top:6px;display:block;">Compound class — used for the literature search instead of the name:</label>
+                                <input type="text" class="compound-class" placeholder="e.g., anthracycline, kinase inhibitor"
+                                       value="${data?.compound_class || ''}">
+                            </div>
                         </div>
                         
                         <div class="form-group">
@@ -1932,6 +1945,9 @@
                 groupsData.push({
                     group_name: groupEl.querySelector('.group-name').value,
                     drug_name: groupEl.querySelector('.drug-name').value,
+                    confidential: !!groupEl.querySelector('.confidential-cb')?.checked,
+                    smiles: (groupEl.querySelector('.compound-smiles')?.value || '').trim(),
+                    compound_class: (groupEl.querySelector('.compound-class')?.value || '').trim(),
                     dose: groupEl.querySelector('.dose').value,
                     vehicle: (groupEl.querySelector('.vehicle')?.value || '').trim(),
                     vehicle_volume: (groupEl.querySelector('.vehicle-volume')?.value || '').trim(),

@@ -222,6 +222,11 @@ if VALIDATION_AVAILABLE:
         drug_name = fields.Str(required=True, validate=validate.Length(min=1, max=200))
         dose = fields.Float(validate=validate.Range(min=0, max=10000))
         strain = fields.Str()
+        # Confidential / unpublished compound: the name stays inside the platform,
+        # the investigator supplies the structure, and the class is searched instead.
+        confidential = fields.Boolean()
+        smiles = fields.Str(validate=validate.Length(max=1000))
+        compound_class = fields.Str(validate=validate.Length(max=200))
 
         sex = fields.Str(validate=validate.OneOf(['Male', 'Female', 'Mixed']))
         target_organ = fields.Str(validate=validate.Length(max=200))
@@ -2566,10 +2571,28 @@ ml_model = SampleSizeMLModel() if ML_AVAILABLE else None
 # ENHANCED API FUNCTIONS - MULTIPLE SOURCES
 # ============================================================================
 
+def is_confidential(group):
+    """True when the investigator marked the compound as unpublished/confidential."""
+    return bool((group or {}).get('confidential'))
+
+
+def external_term(group):
+    """The compound term used in EXTERNAL queries.
+
+    For a confidential compound the name never leaves the platform: its class
+    (e.g. 'anthracycline') is searched instead, so the literature is retrieved
+    from the study context rather than from an identifying name.
+    """
+    group = group or {}
+    if is_confidential(group):
+        return (group.get('compound_class') or '').strip()
+    return (group.get('drug_name') or '').strip()
+
+
 def search_semantic_scholar(group, max_results=5):
     """Search Semantic Scholar API for papers."""
     cache_key = {
-        'drug': group.get('drug_name', ''),
+        'drug': external_term(group),
         'strain': group.get('strain', ''),
         'target': group.get('target_organ', ''),
         'max': max_results
@@ -2580,7 +2603,7 @@ def search_semantic_scholar(group, max_results=5):
         return cached
     
     query_parts = [
-        group.get('drug_name', ''),
+        external_term(group),
         group.get('strain', ''),
         group.get('target_organ', ''),
         'mouse model'
@@ -2633,7 +2656,7 @@ def search_semantic_scholar(group, max_results=5):
 def search_openalex(group, max_results=5):
     """Search OpenAlex API for papers."""
     cache_key = {
-        'drug': group.get('drug_name', ''),
+        'drug': external_term(group),
         'strain': group.get('strain', ''),
         'target': group.get('target_organ', ''),
         'max': max_results
@@ -2644,7 +2667,7 @@ def search_openalex(group, max_results=5):
         return cached
     
     query_parts = [
-        group.get('drug_name', ''),
+        external_term(group),
         group.get('strain', ''),
         group.get('target_organ', ''),
         'mouse'
@@ -2694,7 +2717,7 @@ def search_openalex(group, max_results=5):
 def search_crossref(group, max_results=5):
     """Search CrossRef API for papers."""
     cache_key = {
-        'drug': group.get('drug_name', ''),
+        'drug': external_term(group),
         'strain': group.get('strain', ''),
         'target': group.get('target_organ', ''),
         'max': max_results
@@ -2705,7 +2728,7 @@ def search_crossref(group, max_results=5):
         return cached
     
     query_parts = [
-        group.get('drug_name', ''),
+        external_term(group),
         group.get('strain', ''),
         group.get('target_organ', ''),
         'mouse study'
@@ -2850,7 +2873,7 @@ def _pubmed_search_with_retry(term, max_results):
 def search_pubmed_articles(group, max_results=5):
     """Search PubMed for relevant articles with caching."""
     cache_key = {
-        'drug': group.get("drug_name", ""),
+        'drug': external_term(group),
         'strain': group.get("strain", ""),
         'target': group.get("target_organ", ""),
         'max': max_results
@@ -2861,7 +2884,7 @@ def search_pubmed_articles(group, max_results=5):
         return cached
     
     parts_full = [
-        group.get("drug_name", ""),
+        external_term(group),
         group.get("strain", ""),
         group.get("target_organ", ""),
         "mouse[Title/Abstract] OR mice[Title/Abstract]"
@@ -2923,7 +2946,7 @@ def search_pubmed_articles(group, max_results=5):
 def search_europe_pmc(group, max_results=12):
     """Search Europe PMC, prioritising OPEN-ACCESS full-text papers and pulling a
     mix of recent and older (classic) work so the reference list isn't all new."""
-    drug = group.get("drug_name", "")
+    drug = external_term(group)
     parts = [drug, group.get("target_organ", ""), "toxicity", "mouse OR mice OR rat"]
     base_q = " ".join([p for p in parts if p]).strip()
     if not base_q:
@@ -2978,7 +3001,7 @@ def search_europe_pmc(group, max_results=12):
 def search_doaj(group, max_results=6):
     """Search DOAJ (Directory of Open Access Journals) — fully open-access,
     peer-reviewed journal articles."""
-    parts = [group.get("drug_name", ""), group.get("target_organ", ""), "toxicity"]
+    parts = [external_term(group), group.get("target_organ", ""), "toxicity"]
     q = " ".join([p for p in parts if p]).strip()
     if not q:
         return []
@@ -3024,7 +3047,7 @@ def search_doaj(group, max_results=6):
 
 def search_preprints(group, max_results=6):
     """Search bioRxiv / medRxiv preprints (indexed and served via Europe PMC)."""
-    parts = [group.get("drug_name", ""), group.get("target_organ", ""), "toxicity",
+    parts = [external_term(group), group.get("target_organ", ""), "toxicity",
              "mouse OR mice OR rat"]
     base_q = " ".join([p for p in parts if p]).strip()
     if not base_q:
@@ -3171,7 +3194,8 @@ def search_impc(group, max_results=3):
 
 def build_comprehensive_reference_corpus(group):
     """Build comprehensive reference corpus from ALL sources."""
-    logger.info(f"Building comprehensive reference corpus for {group.get('drug_name', 'unknown')}")
+    logger.info("Building comprehensive reference corpus for "
+                + (external_term(group) or "unnamed compound"))
     
     # Search all APIs CONCURRENTLY so total time ≈ the slowest single call
     # (not the sum). One slow/failing database no longer stalls the request.
@@ -3548,13 +3572,24 @@ def get_prediction_and_suggestion(group, all_groups_count=1):
         num_replicates=max(1, int(parse_float_safe(group.get('blood_replicates'), 1)))
     )
 
+    _private = is_confidential(group)
+
     def build_summary(recommended_range):
         """A clear, simple recommendation summary for the UI."""
         # Real toxicity % from LD50 (experimental first, then model estimate)
         tox_pct = tox_cat = ld50_val = tox_source = None
         if not is_control:
             try:
-                info = get_real_ld50_info(drug, route=group.get('route', 'oral'), species=species)
+                if _private:
+                    # Name-based lookup would expose the compound — predict from
+                    # the pasted structure with the local model instead.
+                    info = {'found': False}
+                    _ml = toxicity_predictor.predict_ld50_ml((group.get('smiles') or '').strip())
+                    if _ml:
+                        info = {'found': True, 'ld50_mg_kg': _ml['ld50_mg_kg'],
+                                'category': _ml['category'], 'source': 'ml_model'}
+                else:
+                    info = get_real_ld50_info(drug, route=group.get('route', 'oral'), species=species)
                 if info.get('found'):
                     ld50_val = info['ld50_mg_kg']
                     tox_cat = info['category']
@@ -3636,7 +3671,7 @@ def get_prediction_and_suggestion(group, all_groups_count=1):
 
         # Brief compound overview + reference (skip for controls)
         drug_overview = None
-        if not is_control:
+        if not is_control and not _private:      # both look the compound up by name
             try:
                 drug_overview = get_compound_summary(drug)
             except Exception as e:
@@ -3644,7 +3679,7 @@ def get_prediction_and_suggestion(group, all_groups_count=1):
 
         # ClinicalTrials.gov context (free, no key; strict 4s timeout — the
         # function swallows any error/timeout, so results never hang). Controls skipped.
-        clinical_trials = search_clinical_trials(drug) if not is_control else None
+        clinical_trials = None if (is_control or _private) else search_clinical_trials(drug)
 
         # Recommended strain by experimental paradigm (common choices in the
         # literature) — a suggestion the researcher can override.
@@ -3673,7 +3708,13 @@ def get_prediction_and_suggestion(group, all_groups_count=1):
         ml_adme = []
         if not is_control:
             try:
-                _struct = toxicity_predictor.get_chemical_structure(drug)
+                # Confidential compound: use the structure the investigator pasted,
+                # so the name is never sent to PubChem. Models run locally either way.
+                if _private:
+                    _smi = (group.get('smiles') or '').strip()
+                    _struct = {'success': bool(_smi), 'smiles': _smi}
+                else:
+                    _struct = toxicity_predictor.get_chemical_structure(drug)
                 if _struct.get('success'):
                     _smi = _struct['smiles']
                     _feats = toxicity_predictor._featurize_smiles(_smi)   # once, shared
@@ -3737,6 +3778,7 @@ def get_prediction_and_suggestion(group, all_groups_count=1):
             'ml_adme': ml_adme,             # ML ADME regression values (LogD, Caco-2, PPBR)
             'clinical_trials': clinical_trials,  # ClinicalTrials.gov context (free)
             'is_control': is_control,       # lets the UI match control N to treatment N
+            'confidential': _private,       # compound name kept inside the platform
             'timeline': build_protocol_timeline(group, animal_word),
             'welfare': welfare,
             'biological_advice': biological_advice_for(species, group),
@@ -3787,7 +3829,8 @@ def get_prediction_and_suggestion(group, all_groups_count=1):
     if ml_model:
         group['num_groups'] = all_groups_count
         ml_prediction = ml_model.predict_sample_size(group)
-        logger.info(f"ML prediction for {drug}: {ml_prediction}")
+        logger.info("ML prediction for %s: %s",
+                    ("[confidential compound]" if is_confidential(group) else drug), ml_prediction)
     
     # ENHANCED: Dynamic sample size calculation based on multiple factors
     base_n = 8  # Base sample size
@@ -5294,7 +5337,17 @@ def predict():
         for group in all_groups:
             gname = group.get('group_name', 'Group')
             try:
-                ncbi = get_drug_data_from_ncbi(group.get('drug_name', ''))
+                if is_confidential(group):
+                    # Never resolve a confidential name against PubChem. The
+                    # investigator supplies the structure instead.
+                    if not (group.get('smiles') or '').strip():
+                        results.append({"group_name": gname,
+                                        "error": "Confidential compound: please paste the chemical "
+                                                 "structure (SMILES) so the predictions can run locally."})
+                        continue
+                    ncbi = {"success": True, "ncbi_link": "#"}
+                else:
+                    ncbi = get_drug_data_from_ncbi(group.get('drug_name', ''))
 
                 if not ncbi['success'] and not ncbi.get('is_control'):
                     results.append({"group_name": gname, "error": ncbi['error']})
