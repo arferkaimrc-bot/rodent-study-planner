@@ -489,6 +489,21 @@ class ToxicityPredictor:
                 logger.error(f"Failed to load ADME model {key}: {e}")
         if self.adme_models:
             logger.info(f"Loaded {len(self.adme_models)} ML ADME models: {list(self.adme_models)}")
+        # Applicability-domain references: the training fingerprints of each
+        # model, used to withhold predictions for compounds outside the
+        # chemical space the model actually learned from.
+        self.domain_refs = {}
+        try:
+            import numpy as _np
+            for _f in os.listdir(Config.ML_MODEL_PATH):
+                if _f.endswith('_domain.npz'):
+                    _k = _f[:-len('_domain.npz')]
+                    self.domain_refs[_k] = _np.load(
+                        os.path.join(Config.ML_MODEL_PATH, _f))['fps']
+        except Exception as e:
+            logger.error(f"Failed to load applicability-domain references: {e}")
+        if self.domain_refs:
+            logger.info(f"Loaded {len(self.domain_refs)} applicability-domain references")
         logger.info("ToxicityPredictor initialized")
     
     def get_chemical_structure(self, drug_name):
@@ -634,6 +649,9 @@ class ToxicityPredictor:
         except Exception as e:
             logger.error(f"LD50 model prediction failed: {e}")
             return None
+        dom = self.domain_check(smiles, 'ld50')
+        if dom and not dom['in_domain']:
+            return None            # no defensible estimate outside the domain
         mol_per_kg = 10 ** (-y)
         ld50_mg_kg = mol_per_kg * mw * 1000
         category, ld50_range = self.ld50_mgkg_to_category(ld50_mg_kg)
@@ -648,6 +666,38 @@ class ToxicityPredictor:
             'source': 'ml_model',
             'source_detail': (self.ld50_meta or {}).get('source', 'trained model'),
         }
+
+    # A Morgan/Tanimoto similarity below this to every training compound means
+    # the molecule is unlike anything the model learned from, so its output is
+    # not meaningful. 0.30 is the conventional cut-off for ECFP-style prints.
+    DOMAIN_MIN_SIMILARITY = 0.30
+
+    def domain_check(self, smiles, key):
+        """Max Tanimoto similarity of `smiles` to the model's training set.
+
+        Returns {'in_domain': bool, 'similarity': float} or None when the check
+        cannot run (missing reference or unparseable structure)."""
+        ref = self.domain_refs.get(key)
+        if ref is None or not RDKIT_AVAILABLE:
+            return None
+        try:
+            import numpy as np
+            mol = Chem.MolFromSmiles(smiles)
+            if mol is None:
+                return None
+            fp = rdMolDescriptors.GetMorganFingerprintAsBitVect(mol, radius=2, nBits=256)
+            q = np.packbits(np.array(fp, dtype=np.uint8))
+            # Tanimoto on packed bits: |A&B| / (|A| + |B| - |A&B|)
+            inter = np.unpackbits(np.bitwise_and(ref, q), axis=1).sum(axis=1)
+            a = np.unpackbits(q).sum()
+            b = np.unpackbits(ref, axis=1).sum(axis=1)
+            union = a + b - inter
+            sim = float(np.max(np.where(union > 0, inter / np.maximum(union, 1), 0.0)))
+            return {'in_domain': sim >= self.DOMAIN_MIN_SIMILARITY,
+                    'similarity': round(sim, 2)}
+        except Exception as e:
+            logger.warning(f"Domain check failed for {key}: {e}")
+            return None
 
     @staticmethod
     def logs_to_solubility(logs):
@@ -675,6 +725,10 @@ class ToxicityPredictor:
         except Exception as e:
             logger.error(f"Solubility model prediction failed: {e}")
             return None
+        dom = self.domain_check(smiles, 'solubility')
+        if dom and not dom['in_domain']:
+            return {'out_of_domain': True, 'similarity': dom['similarity'],
+                    'source': 'ml_model'}
         category, vehicle_hint = self.logs_to_solubility(logs)
         mg_per_mL = (10 ** logs) * mw          # mol/L * g/mol = g/L = mg/mL
         r2 = (self.solubility_meta or {}).get('test_r2', 0.78)
@@ -717,6 +771,10 @@ class ToxicityPredictor:
             logger.error(f"Half-life model prediction failed: {e}")
             return None
         hours = 10 ** y
+        dom = self.domain_check(smiles, 'halflife')
+        if dom and not dom['in_domain']:
+            return {'out_of_domain': True, 'similarity': dom['similarity'],
+                    'source': 'ml_model'}
         category, frequency_hint = self.hours_to_frequency(hours)
         r2 = (self.halflife_meta or {}).get('test_r2', 0.27)
         # Confidence is deliberately conservative — this model is weak (R2~0.27).
@@ -754,10 +812,22 @@ class ToxicityPredictor:
             except Exception as e:
                 logger.error(f"Flag model {key} prediction failed: {e}")
                 continue
+            dom = self.domain_check(smiles, key)
+            if dom and not dom['in_domain']:
+                # Outside the model's chemical space — report that, not a number.
+                out.append({
+                    'key': key, 'label': meta.get('label', key),
+                    'out_of_domain': True, 'similarity': dom['similarity'],
+                    'is_risk': key in self._RISK_FLAG_KEYS,
+                    'auc': round(meta.get('test_auc', 0.75), 2),
+                    'source': meta.get('source', ''),
+                })
+                continue
             out.append({
                 'key': key,
                 'label': meta.get('label', key),
                 'probability': round(p, 2),
+                'domain_similarity': (dom or {}).get('similarity'),
                 'flag': 'high' if p >= 0.5 else 'low',
                 'is_risk': key in self._RISK_FLAG_KEYS,
                 'meaning': meta.get('positive_meaning', ''),
@@ -781,6 +851,11 @@ class ToxicityPredictor:
                 p = float(model.predict(X)[0])
             except Exception as e:
                 logger.error(f"ADME model {key} prediction failed: {e}")
+                continue
+            dom = self.domain_check(smiles, key)
+            if dom and not dom['in_domain']:
+                out.append({'key': key, 'label': meta.get('label', key),
+                            'out_of_domain': True, 'similarity': dom['similarity']})
                 continue
             val = 10 ** p if meta.get('log') else p
             out.append({

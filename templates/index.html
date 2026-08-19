@@ -2201,18 +2201,28 @@
                                     <div class="stile-value" style="color:${toxColor};">${toxText}${toxCat}</div>
                                     ${s.ld50_mg_kg ? `<div class="stile-sub">LD50 ${s.ld50_mg_kg} mg/kg · ${s.toxicity_source === 'experimental' ? '📗 experimental data' : '📘 model estimate'}</div>` : ''}
                                 </div>
-                                ${s.solubility ? `
+                                ${s.solubility ? (s.solubility.out_of_domain ? `
+                                <div class="summary-tile">
+                                    <div class="stile-label">💧 Solubility <span style="color:var(--info);font-weight:700;">🤖 ML</span></div>
+                                    <div class="stile-value" style="color:#64748b;font-size:1.05rem;">Not predicted</div>
+                                    <div class="stile-sub">Outside the model’s applicability domain (nearest training compound similarity ${s.solubility.similarity}, threshold 0.30)</div>
+                                </div>` : `
                                 <div class="summary-tile">
                                     <div class="stile-label">💧 Solubility <span style="color:var(--info);font-weight:700;">🤖 ML</span></div>
                                     <div class="stile-value" style="color:${solColor};text-transform:capitalize;">${s.solubility.category}</div>
                                     <div class="stile-sub">logS ${s.solubility.logS} · ~${s.solubility.mg_per_mL} mg/mL · ${s.solubility.confidence}% conf</div>
-                                </div>` : ''}
-                                ${s.halflife ? `
+                                </div>`) : ''}
+                                ${s.halflife ? (s.halflife.out_of_domain ? `
+                                <div class="summary-tile">
+                                    <div class="stile-label">⏱️ Half-life <span style="color:var(--info);font-weight:700;">🤖 ML</span></div>
+                                    <div class="stile-value" style="color:#64748b;font-size:1.05rem;">Not predicted</div>
+                                    <div class="stile-sub">Outside the model’s applicability domain (nearest training compound similarity ${s.halflife.similarity}, threshold 0.30)</div>
+                                </div>` : `
                                 <div class="summary-tile">
                                     <div class="stile-label">⏱️ Half-life <span style="color:var(--info);font-weight:700;">🤖 ML</span></div>
                                     <div class="stile-value" style="color:${hlColor};text-transform:capitalize;">${s.halflife.category}</div>
                                     <div class="stile-sub">~${s.halflife.hours} h (human PK, relative) · ${s.halflife.confidence}% conf</div>
-                                </div>` : ''}
+                                </div>`) : ''}
                                 <div class="summary-tile">
                                     <div class="stile-label">🎯 Focus</div>
                                     <div class="stile-value" style="font-size:1.05rem;">${s.target_organ && s.target_organ !== 'General' ? s.target_organ : (s.experiment_type || 'General')}</div>
@@ -2232,19 +2242,24 @@
                                     <div class="stile-label">🤖 ML predicted flags <span style="font-weight:400;">(structure-based screening — verify experimentally)</span></div>
                                     <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;">
                                         ${s.ml_flags.map(f => {
+                                            if (f.out_of_domain) {
+                                                return `<span title="Nearest training compound similarity ${f.similarity} (threshold 0.30) — this model was not trained on compounds like this one" style="padding:4px 9px;border-radius:8px;font-size:.8rem;font-weight:600;background:#f8fafc;color:#64748b;border:1px dashed #94a3b8;">${f.label}: not predicted \u2014 outside model domain</span>`;
+                                            }
                                             const pct = Math.round(f.probability * 100);
                                             const c = !f.is_risk ? ['#eff6ff','#1d4ed8','#bfdbfe'] : (f.flag === 'high' ? ['#fef2f2','#b91c1c','#fecaca'] : ['#f0fdf4','#166534','#bbf7d0']);
                                             const verdict = f.is_risk ? (f.flag === 'high' ? 'likely' : 'unlikely') : (f.flag === 'high' ? 'yes' : 'no');
                                             return `<span title="AUC ${f.auc} · ${f.source}" style="padding:4px 9px;border-radius:8px;font-size:.8rem;font-weight:600;background:${c[0]};color:${c[1]};border:1px solid ${c[2]};">${f.label}: ${verdict} (${pct}%)</span>`;
                                         }).join('')}
                                     </div>
-                                    <div class="stile-sub">Structure-based ML estimates (test AUC 0.81–0.92) — screening aids, not diagnoses.</div>
+                                    <div class="stile-sub">Structure-based ML estimates (test AUC 0.81–0.92) — screening aids, not diagnoses. Dashed entries fall outside that model’s applicability domain, so no value is reported.</div>
                                 </div>` : ''}
                                 ${(s.ml_adme && s.ml_adme.length) ? `
                                 <div class="summary-tile wide">
                                     <div class="stile-label">🧬 Predicted ADME properties <span style="font-weight:400;">(ML — structure-based estimates)</span></div>
                                     <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;">
-                                        ${s.ml_adme.map(a => `<span title="R² ${a.r2} · ${a.key}" style="padding:4px 9px;border-radius:8px;font-size:.8rem;font-weight:600;background:#f8fafc;color:#334155;border:1px solid var(--border);">${a.label}: ${a.value}${a.unit ? ' ' + a.unit : ''}</span>`).join('')}
+                                        ${s.ml_adme.map(a => a.out_of_domain
+                                            ? `<span title="Nearest training compound similarity ${a.similarity} (threshold 0.30)" style="padding:4px 9px;border-radius:8px;font-size:.8rem;font-weight:600;background:#f8fafc;color:#64748b;border:1px dashed #94a3b8;">${a.label}: not predicted \u2014 outside model domain</span>`
+                                            : `<span title="R² ${a.r2} · ${a.key}" style="padding:4px 9px;border-radius:8px;font-size:.8rem;font-weight:600;background:#f8fafc;color:#334155;border:1px solid var(--border);">${a.label}: ${a.value}${a.unit ? ' ' + a.unit : ''}</span>`).join('')}
                                     </div>
                                 </div>` : ''}
                                 ${s.clinical_trials && s.clinical_trials.total ? `
@@ -2269,11 +2284,11 @@
                                 </div>
                                 <div class="ai-dosing-row">
                                     <span class="ai-dosing-key">Formulation / Vehicle <span style="color:var(--info);">🤖 ML</span>:</span>
-                                    <span class="ai-dosing-val${s.solubility ? '' : ' placeholder'}">${s.solubility ? `Predicted ${s.solubility.category} aqueous solubility (logS ${s.solubility.logS}, ~${s.solubility.mg_per_mL} mg/mL). ${s.solubility.vehicle_hint}` : 'e.g., vehicle guidance appears here once solubility is predicted'}</span>
+                                    <span class="ai-dosing-val${(s.solubility && !s.solubility.out_of_domain) ? '' : ' placeholder'}">${!s.solubility ? 'e.g., vehicle guidance appears here once solubility is predicted' : (s.solubility.out_of_domain ? 'No vehicle guidance \u2014 this compound falls outside the solubility model\u2019s applicability domain, so no value is reported. Use the measured solubility from the supplier data sheet.' : `Predicted ${s.solubility.category} aqueous solubility (logS ${s.solubility.logS}, ~${s.solubility.mg_per_mL} mg/mL). ${s.solubility.vehicle_hint}`)}</span>
                                 </div>
                                 <div class="ai-dosing-row">
                                     <span class="ai-dosing-key">Frequency of Dosing <span style="color:var(--info);">🤖 ML</span>:</span>
-                                    <span class="ai-dosing-val${s.halflife ? '' : ' placeholder'}">${s.halflife ? `Predicted ${s.halflife.category} half-life (~${s.halflife.hours} h — human PK, relative indicator). ${s.halflife.frequency_hint}` : 'e.g., dosing-frequency guidance appears here once half-life is predicted'}</span>
+                                    <span class="ai-dosing-val${(s.halflife && !s.halflife.out_of_domain) ? '' : ' placeholder'}">${!s.halflife ? 'e.g., dosing-frequency guidance appears here once half-life is predicted' : (s.halflife.out_of_domain ? 'No frequency guidance \u2014 this compound falls outside the half-life model\u2019s applicability domain, so no value is reported. Base the schedule on published PK for this compound.' : `Predicted ${s.halflife.category} half-life (~${s.halflife.hours} h — human PK, relative indicator). ${s.halflife.frequency_hint}`)}</span>
                                 </div>
                             </div>
                         `;

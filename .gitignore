@@ -22,3 +22,6 @@ STEPready-Complete.zip
 # Local-only (contain secrets / one-off)
 init_neon.py
 DEPLOY_GOOGLE.md
+
+# Offline training data (only needed to rebuild models/domain refs)
+data/*.tab
