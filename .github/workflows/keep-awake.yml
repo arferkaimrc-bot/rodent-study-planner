@@ -1,0 +1,28 @@
+# Keeps the Render free-tier service from sleeping.
+#
+# Render stops a free web service after ~15 minutes without traffic, and the
+# next visitor then waits through a cold start (this app loads 16 ML models, so
+# that is 1–2 minutes). This workflow pings the lightweight /health endpoint so
+# the service stays warm during working hours.
+name: Keep service awake
+
+on:
+  schedule:
+    # Every 10 minutes, 05:00–17:00 UTC (08:00–20:00 Riyadh), Sun–Thu.
+    # Outside those hours the service is allowed to sleep — nobody is using it.
+    - cron: "*/10 5-17 * * 0-4"
+  workflow_dispatch:        # lets you wake it manually before a demo
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Ping health endpoint
+        run: |
+          # --max-time 180 tolerates a cold start; the point is to trigger the
+          # wake-up, so a slow first response is success, not failure.
+          code=$(curl -sSL -o /dev/null -w '%{http_code}' --max-time 180 \
+                 https://www.rodent-planner.com/health)
+          echo "HTTP $code"
+          test "$code" = "200"
