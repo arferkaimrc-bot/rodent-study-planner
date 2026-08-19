@@ -2143,9 +2143,10 @@
                         // Clear, simple recommendation summary
                         const s = result.summary || {};
                         const speciesIcon = s.species === 'Rat' ? '🐀' : '🐭';
-                        const toxPct = s.toxicity_percentage;
-                        const toxColor = (toxPct == null) ? '#64748b' : toxPct >= 70 ? '#ef4444' : toxPct >= 45 ? '#f59e0b' : '#10b981';
-                        const toxText = (toxPct == null) ? '—' : `${toxPct}%`;
+                        const ghs = s.ghs;
+                        const ghsLevel = ghs ? parseInt((ghs.category.match(/\d+/) || ['9'])[0], 10) : null;
+                        const toxColor = !ghs ? '#64748b' : ghsLevel <= 2 ? '#ef4444' : ghsLevel === 3 ? '#f59e0b' : '#10b981';
+                        const toxText = ghs ? ghs.category : 'No data';
                         const solColor = !s.solubility ? '#64748b' : s.solubility.category === 'low' ? '#ef4444' : s.solubility.category === 'moderate' ? '#f59e0b' : '#10b981';
                         const hlColor = !s.halflife ? '#64748b' : s.halflife.category === 'short' ? '#f59e0b' : '#10b981';
                         // Alternative Options — from high ML risk flags + paradigm compounds
@@ -2197,9 +2198,10 @@
                                     <div class="stile-sub">diet: ${s.diet_type || 'Standard'}</div>
                                 </div>
                                 <div class="summary-tile">
-                                    <div class="stile-label">☠️ Toxicity</div>
-                                    <div class="stile-value" style="color:${toxColor};">${toxText}${toxCat}</div>
-                                    ${s.ld50_mg_kg ? `<div class="stile-sub">LD50 ${s.ld50_mg_kg} mg/kg · ${s.toxicity_source === 'experimental' ? '📗 experimental data' : '📘 model estimate'}</div>` : ''}
+                                    <div class="stile-label">☠️ Acute toxicity <span style="font-weight:400;">(GHS oral)</span></div>
+                                    <div class="stile-value" style="color:${toxColor};font-size:${ghs ? '1.05rem' : '1rem'};">${toxText}</div>
+                                    ${ghs ? `<div class="stile-sub" title="${ghs.scale}">${ghs.band} · ${ghs.hazard}<br>LD50 ${s.ld50_mg_kg} mg/kg${s.ld50_error_band ? ' (' + s.ld50_error_band + ')' : ''} · ${s.toxicity_source === 'experimental' ? '📗 published experimental value' : '📘 model estimate'}</div>`
+                                      : `<div class="stile-sub">No published LD50 found, and the compound is outside the model’s applicability domain — nothing is estimated.</div>`}
                                 </div>
                                 ${s.solubility ? (s.solubility.out_of_domain ? `
                                 <div class="summary-tile">
@@ -2210,7 +2212,7 @@
                                 <div class="summary-tile">
                                     <div class="stile-label">💧 Solubility <span style="color:var(--info);font-weight:700;">🤖 ML</span></div>
                                     <div class="stile-value" style="color:${solColor};text-transform:capitalize;">${s.solubility.category}</div>
-                                    <div class="stile-sub">logS ${s.solubility.logS} · ~${s.solubility.mg_per_mL} mg/mL · ${s.solubility.confidence}% conf</div>
+                                    <div class="stile-sub">logS ${s.solubility.logS} · ~${s.solubility.mg_per_mL} mg/mL (${s.solubility.error_band}) · model test R² ${s.solubility.test_r2}</div>
                                 </div>`) : ''}
                                 ${s.halflife ? (s.halflife.out_of_domain ? `
                                 <div class="summary-tile">
@@ -2221,7 +2223,7 @@
                                 <div class="summary-tile">
                                     <div class="stile-label">⏱️ Half-life <span style="color:var(--info);font-weight:700;">🤖 ML</span></div>
                                     <div class="stile-value" style="color:${hlColor};text-transform:capitalize;">${s.halflife.category}</div>
-                                    <div class="stile-sub">~${s.halflife.hours} h (human PK, relative) · ${s.halflife.confidence}% conf</div>
+                                    <div class="stile-sub" title="${s.halflife.withheld_reason || ''}">Ordinal band only — no hour value reported (model test R² ${s.halflife.test_r2}, too weak to quote a number). Human PK, relative indicator.</div>
                                 </div>`) : ''}
                                 <div class="summary-tile">
                                     <div class="stile-label">🎯 Focus</div>
@@ -2248,18 +2250,19 @@
                                             const pct = Math.round(f.probability * 100);
                                             const c = !f.is_risk ? ['#eff6ff','#1d4ed8','#bfdbfe'] : (f.flag === 'high' ? ['#fef2f2','#b91c1c','#fecaca'] : ['#f0fdf4','#166534','#bbf7d0']);
                                             const verdict = f.is_risk ? (f.flag === 'high' ? 'likely' : 'unlikely') : (f.flag === 'high' ? 'yes' : 'no');
-                                            return `<span title="AUC ${f.auc} · ${f.source}" style="padding:4px 9px;border-radius:8px;font-size:.8rem;font-weight:600;background:${c[0]};color:${c[1]};border:1px solid ${c[2]};">${f.label}: ${verdict} (${pct}%)</span>`;
+                                            const weak = f.reliability === 'weak' ? ' ⚠︎' : '';
+                                            return `<span title="AUC ${f.auc} (${f.reliability}) · ${f.source}" style="padding:4px 9px;border-radius:8px;font-size:.8rem;font-weight:600;background:${c[0]};color:${c[1]};border:1px solid ${c[2]};">${f.label}: ${verdict} (${pct}%)${weak}</span>`;
                                         }).join('')}
                                     </div>
                                     <div class="stile-sub">Structure-based ML estimates (test AUC 0.81–0.92) — screening aids, not diagnoses. Dashed entries fall outside that model’s applicability domain, so no value is reported.</div>
                                 </div>` : ''}
                                 ${(s.ml_adme && s.ml_adme.length) ? `
                                 <div class="summary-tile wide">
-                                    <div class="stile-label">🧬 Predicted ADME properties <span style="font-weight:400;">(ML — structure-based estimates)</span></div>
+                                    <div class="stile-label">🧬 Predicted ADME properties <span style="font-weight:400;">(ML — structure-based estimates; ⚠︎ marks a weak model, see tooltip for R²)</span></div>
                                     <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;">
                                         ${s.ml_adme.map(a => a.out_of_domain
                                             ? `<span title="Nearest training compound similarity ${a.similarity} (threshold 0.30)" style="padding:4px 9px;border-radius:8px;font-size:.8rem;font-weight:600;background:#f8fafc;color:#64748b;border:1px dashed #94a3b8;">${a.label}: not predicted \u2014 outside model domain</span>`
-                                            : `<span title="R² ${a.r2} · ${a.key}" style="padding:4px 9px;border-radius:8px;font-size:.8rem;font-weight:600;background:#f8fafc;color:#334155;border:1px solid var(--border);">${a.label}: ${a.value}${a.unit ? ' ' + a.unit : ''}</span>`).join('')}
+                                            : `<span title="R² ${a.r2} (${a.reliability})${a.test_mae != null ? ' · MAE ' + a.test_mae : ''} · ${a.key}" style="padding:4px 9px;border-radius:8px;font-size:.8rem;font-weight:600;background:#f8fafc;color:#334155;border:1px solid var(--border);">${a.label}: ${a.value}${a.unit ? ' ' + a.unit : ''}${a.reliability === 'weak' ? ' ⚠︎' : ''}</span>`).join('')}
                                     </div>
                                 </div>` : ''}
                                 ${s.clinical_trials && s.clinical_trials.total ? `
@@ -2288,7 +2291,7 @@
                                 </div>
                                 <div class="ai-dosing-row">
                                     <span class="ai-dosing-key">Frequency of Dosing <span style="color:var(--info);">🤖 ML</span>:</span>
-                                    <span class="ai-dosing-val${(s.halflife && !s.halflife.out_of_domain) ? '' : ' placeholder'}">${!s.halflife ? 'e.g., dosing-frequency guidance appears here once half-life is predicted' : (s.halflife.out_of_domain ? 'No frequency guidance \u2014 this compound falls outside the half-life model\u2019s applicability domain, so no value is reported. Base the schedule on published PK for this compound.' : `Predicted ${s.halflife.category} half-life (~${s.halflife.hours} h — human PK, relative indicator). ${s.halflife.frequency_hint}`)}</span>
+                                    <span class="ai-dosing-val${(s.halflife && !s.halflife.out_of_domain) ? '' : ' placeholder'}">${!s.halflife ? 'e.g., dosing-frequency guidance appears here once half-life is predicted' : (s.halflife.out_of_domain ? 'No frequency guidance \u2014 this compound falls outside the half-life model\u2019s applicability domain, so no value is reported. Base the schedule on published PK for this compound.' : `Predicted ${s.halflife.category} half-life band (human PK, relative indicator — no hour value is quoted; model test R² ${s.halflife.test_r2}). ${s.halflife.frequency_hint}`)}</span>
                                 </div>
                             </div>
                         `;
@@ -2333,10 +2336,13 @@
 
                         // SECTION: Toxicity & Humane Endpoints
                         const w = s.welfare;
-                        if (w || s.toxicity_percentage != null) {
-                            let toxHtml = `<p style="margin:0 0 8px;"><strong>Toxicity:</strong>
-                                <span style="color:${toxColor};font-weight:700;">${toxText}</span>${toxCat}
-                                ${s.ld50_mg_kg ? '· LD50 ' + s.ld50_mg_kg + ' mg/kg · ' + (s.toxicity_source === 'experimental' ? '📗 experimental data' : '📘 model estimate') : ''}</p>`;
+                        if (w || ghs) {
+                            let toxHtml = `<p style="margin:0 0 8px;"><strong>Acute toxicity (GHS oral):</strong>
+                                <span style="color:${toxColor};font-weight:700;">${toxText}</span>
+                                ${ghs ? '· ' + ghs.band + ' · LD50 ' + s.ld50_mg_kg + ' mg/kg' + (s.ld50_error_band ? ' (' + s.ld50_error_band + ')' : '') + ' · ' + (s.toxicity_source === 'experimental' ? '📗 published experimental value' : '📘 model estimate') : ''}</p>`;
+                            if (w && w.evidence_based === false) {
+                                toxHtml += `<p class="sec-note" style="margin:0 0 8px;color:#b45309;"><strong>Note:</strong> no toxicity data was available for this compound, so the monitoring level below is a generic moderate-risk default — not a finding about this compound.</p>`;
+                            }
                             if (w) {
                                 toxHtml += `
                                     <div style="font-weight:700;font-size:0.85rem;margin:8px 0 4px;">🩺 Humane endpoints (stop criteria):</div>
@@ -2722,285 +2728,6 @@
         document.getElementById('save-draft-btn').onclick = saveDraft;
         document.getElementById('resume-draft-btn').onclick = resumeDraft;
 
-        // ============================================================
-        // NEW: Comprehensive Drug Analysis Functions
-        // ============================================================
-
-        async function analyzeComprehensiveDrug() {
-            const resultsContainer = document.getElementById('results-container');
-            resultsContainer.innerHTML = '';
-            
-            const groupsData = collectGroupsData();
-            const problems = validateGroups(groupsData);
-            if (problems.length) { showFieldErrors(problems); return; }
-
-            const drugName = groupsData[0].drug_name;
-
-            try {
-                showProgress(5, 'Starting comprehensive analysis...');
-
-                for (let i = 0; i < groupsData.length; i++) {
-                    const group = groupsData[i];
-                    
-                    showProgress(10 + (i * 25), `Analyzing ${group.drug_name}...`);
-
-                    const payload = {
-                        drug_name: group.drug_name || 'Unknown',
-                        dose: parseFloat(group.dose) || 10,
-                        weight: parseFloat(group.weight) || 25,
-                        age: parseFloat(group.age) || 8,
-                        sex: group.sex || 'Mixed',
-                        route: group.route || 'Oral',
-                        target_organ: group.target_organ || 'General',
-                        diet_type: group.diet_type || 'Standard'
-                    };
-
-                    const response = await fetch('/analyze-drug-comprehensive', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
-
-                    if (!response.ok) {
-                        let msg = `Server error ${response.status}`;
-                        try {
-                            const errData = await response.json();
-                            if (errData.details) {
-                                const parts = [];
-                                const walk = (obj, path) => {
-                                    if (Array.isArray(obj)) parts.push(`${path}: ${obj.join(', ')}`);
-                                    else if (obj && typeof obj === 'object')
-                                        Object.entries(obj).forEach(([k, v]) => walk(v, path ? `${path}.${k}` : k));
-                                    else if (obj) parts.push(String(obj));
-                                };
-                                walk(errData.details, '');
-                                if (parts.length) msg = parts.join(' | ');
-                            } else if (errData.error) {
-                                msg = errData.error;
-                            }
-                        } catch (_) {}
-                        throw new Error(msg);
-                    }
-
-                    const result = await response.json();
-                    displayComprehensiveDrugAnalysis(result, group);
-                }
-
-                showProgress(100, 'Complete!');
-                setTimeout(hideProgress, 500);
-                resultsContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-
-            } catch (error) {
-                console.error('Comprehensive analysis error:', error);
-                hideProgress();
-                resultsContainer.innerHTML = `
-                    <div style="grid-column: 1 / -1; background: #fee2e2; border: 1px solid #fecaca; color: #991b1b; padding: 20px; border-radius: 12px;">
-                        <h4 style="margin: 0 0 8px 0;">❌ Analysis Error</h4>
-                        <p style="margin: 0;"><strong>Message:</strong> ${error.message}</p>
-                        <p style="margin: 8px 0 0 0;">Please check that the backend server is running.</p>
-                    </div>
-                `;
-            }
-        }
-
-        function displayComprehensiveDrugAnalysis(result, groupData) {
-            const resultsContainer = document.getElementById('results-container');
-            
-            const toxicity = result.toxicity_percentage || 0;
-            const efficacy = result.efficiency_percentage || 0;
-            const safetyMargin = result.risk_benefit_analysis?.safety_margin || 0;
-            
-            let riskColor = '#10b981'; // green
-            if (safetyMargin < 10) riskColor = '#f59e0b'; // amber
-            if (safetyMargin < -10) riskColor = '#ef4444'; // red
-
-            let analysisHtml = `
-                <div class="comprehensive-analysis-card">
-                    <div class="analysis-header">
-                        <h3>🧬 ${result.drug_name}</h3>
-                        <span style="font-size: 0.9rem; color: var(--muted);">${new Date().toLocaleDateString()}</span>
-                    </div>
-
-                    <!-- Toxicity & Efficacy Scores -->
-                    <div class="score-row">
-                        <div class="score-card">
-                            <div class="score-label">☠️ Toxicity</div>
-                            <div class="score-percentage" style="color: ${toxicity > 60 ? '#ef4444' : toxicity > 40 ? '#f59e0b' : '#10b981'}">
-                                ${toxicity.toFixed(1)}%
-                            </div>
-                            <div class="progress-bar-comprehensive">
-                                <div class="progress-fill-toxicity" style="width: ${toxicity}%"></div>
-                            </div>
-                            <div class="score-interpretation">
-                                ${result.toxicity_score?.interpretation || 'Unknown'}
-                            </div>
-                            ${(() => {
-                                const ld50 = result.toxicity_score?.ld50_mg_kg;
-                                if (!ld50) return '';
-                                const src = result.toxicity_score?.ld50_source;
-                                const cat = result.toxicity_score?.ld50_category || '';
-                                const detail = result.toxicity_score?.ld50_source_detail || '';
-                                const badge = src === 'experimental'
-                                    ? '<span style="background:#dcfce7;color:#166534;padding:1px 6px;border-radius:6px;font-size:0.7rem;font-weight:600;">Experimental data</span>'
-                                    : '<span style="background:#e0e7ff;color:#3730a3;padding:1px 6px;border-radius:6px;font-size:0.7rem;font-weight:600;">ML model estimate</span>';
-                                return `<div style="margin-top:8px;font-size:0.8rem;color:var(--muted);">
-                                    <div><strong>LD50:</strong> ${ld50} mg/kg <span style="text-transform:uppercase;">(${cat})</span></div>
-                                    <div style="margin-top:3px;">${badge}</div>
-                                    ${detail ? `<div style="margin-top:3px;font-size:0.7rem;opacity:0.8;">${detail}</div>` : ''}
-                                </div>`;
-                            })()}
-                        </div>
-
-                        <div class="score-card">
-                            <div class="score-label">📚 Literature Evidence</div>
-                            <div class="score-percentage" style="color: ${efficacy > 60 ? '#10b981' : efficacy > 40 ? '#f59e0b' : '#ef4444'}">
-                                ${efficacy.toFixed(0)}%
-                            </div>
-                            <div class="progress-bar-comprehensive">
-                                <div class="progress-fill-efficacy" style="width: ${efficacy}%"></div>
-                            </div>
-                            <div class="score-interpretation">
-                                ${result.efficiency_score?.literature_evidence != null ? result.efficiency_score.literature_evidence.toLocaleString() + ' publications found' : (result.efficiency_score?.interpretation || '')}
-                            </div>
-                            <div style="font-size:0.72rem;color:var(--muted);margin-top:4px;">how much is published — not measured efficacy</div>
-                        </div>
-                    </div>
-
-                    <!-- Safety Margin -->
-                    <div class="safety-margin-box" style="border-left-color: ${riskColor}">
-                        <div class="safety-margin-value" style="color: ${riskColor}">
-                            ${safetyMargin >= 0 ? '+' : ''}${safetyMargin.toFixed(1)}
-                        </div>
-                        <div class="safety-profile">
-                            ${result.risk_benefit_analysis?.profile || 'Unknown Profile'}
-                        </div>
-                        <div style="font-size: 0.9rem; color: var(--muted);">
-                            Safety Margin (Efficacy - Toxicity)
-                        </div>
-                    </div>
-
-                    <!-- Mouse Parameters -->
-                    <div style="margin: 20px 0;">
-                        <h5 style="margin: 0 0 12px 0; color: #667eea;">🐭 Mouse Parameters</h5>
-                        <div class="parameters-grid">
-                            <div class="parameter-item">
-                                <div class="parameter-label">Compound</div>
-                                <div class="parameter-value">${result.mouse_parameters?.compound || 'N/A'}</div>
-                            </div>
-                            <div class="parameter-item">
-                                <div class="parameter-label">Dose (mg/kg)</div>
-                                <div class="parameter-value">${result.mouse_parameters?.dose_mg_kg || 'N/A'}</div>
-                            </div>
-                            <div class="parameter-item">
-                                <div class="parameter-label">Weight (g)</div>
-                                <div class="parameter-value">${result.mouse_parameters?.weight_g || 'N/A'}</div>
-                            </div>
-                            <div class="parameter-item">
-                                <div class="parameter-label">Age (weeks)</div>
-                                <div class="parameter-value">${result.mouse_parameters?.age_weeks || 'N/A'}</div>
-                            </div>
-                            <div class="parameter-item">
-                                <div class="parameter-label">Sex</div>
-                                <div class="parameter-value">${result.mouse_parameters?.sex || 'N/A'}</div>
-                            </div>
-                            <div class="parameter-item">
-                                <div class="parameter-label">Route</div>
-                                <div class="parameter-value">${result.mouse_parameters?.route || 'N/A'}</div>
-                            </div>
-                            <div class="parameter-item">
-                                <div class="parameter-label">Target Organ</div>
-                                <div class="parameter-value">${result.mouse_parameters?.target_organ || 'N/A'}</div>
-                            </div>
-                            <div class="parameter-item">
-                                <div class="parameter-label">Diet Type</div>
-                                <div class="parameter-value">${result.mouse_parameters?.diet_type || 'N/A'}</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Recommendations -->
-                    ${result.recommendations && result.recommendations.length > 0 ? `
-                        <div class="recommendations-box">
-                            <h5>💡 Recommendations</h5>
-                            <ul>
-                                ${result.recommendations.map(rec => `<li>${rec}</li>`).join('')}
-                            </ul>
-                        </div>
-                    ` : ''}
-
-                    <!-- IACUC Welfare: Humane Endpoints (Part 8) & Pain Monitoring (Part 11) -->
-                    ${result.welfare_recommendations ? (() => {
-                        const w = result.welfare_recommendations;
-                        const m = w.monitoring || {};
-                        const lvlColor = m.level === 'high' ? '#ef4444' : m.level === 'moderate' ? '#f59e0b' : '#10b981';
-                        return `
-                        <div style="margin-top:16px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:16px;">
-                            <h5 style="margin:0 0 4px 0;color:#1e40af;">🐭 Animal Welfare — for IACUC protocol (Parts 8 & 11)</h5>
-                            <p style="margin:0 0 12px 0;font-size:0.75rem;color:#64748b;font-style:italic;">${w.disclaimer || ''}</p>
-
-                            <div style="margin-bottom:12px;">
-                                <strong style="font-size:0.9rem;">🩺 Humane endpoints (Part 8):</strong>
-                                <ul style="margin:6px 0 0 0;padding-left:20px;font-size:0.85rem;">
-                                    ${(w.humane_endpoints || []).map(e => `<li style="margin-bottom:3px;">${e}</li>`).join('')}
-                                </ul>
-                            </div>
-
-                            <div style="background:#fff;border-radius:8px;padding:10px 12px;font-size:0.85rem;">
-                                <strong>⚕️ Pain / distress monitoring (Part 11):</strong>
-                                <div style="margin-top:6px;">Monitoring level:
-                                    <span style="color:${lvlColor};font-weight:700;text-transform:uppercase;">${m.level || ''}</span>
-                                </div>
-                                <div style="margin-top:3px;"><strong>Frequency:</strong> ${m.frequency || ''}</div>
-                                <div style="margin-top:3px;"><strong>Analgesia:</strong> ${m.analgesia_guidance || ''}</div>
-                                <div style="margin-top:3px;"><strong>Scoring:</strong> ${m.body_condition_scoring || ''}</div>
-                                <div style="margin-top:6px;color:#7c2d12;"><strong>When an endpoint is reached:</strong> ${w.response_when_endpoint_reached || ''}</div>
-                            </div>
-                        </div>`;
-                    })() : ''}
-
-                    <!-- Literature Section -->
-                    <!-- Citations & Sources: real papers first, then search links -->
-                    <div class="literature-section">
-                        <h5>📚 Citations &amp; Sources</h5>
-                        ${(result.reference_papers && result.reference_papers.length) ? `
-                            <div style="font-size:0.82rem;font-weight:700;margin:4px 0 6px;">🔗 Related papers (click to open):</div>
-                            <ul style="margin:0 0 14px 0;padding-left:18px;font-size:0.86rem;">
-                                ${result.reference_papers.slice(0, 8).map(p => `
-                                    <li style="margin-bottom:9px;">
-                                        <a href="${p.url || p.pubmed_url || '#'}" target="_blank" class="literature-link" style="font-weight:600;">${p.title || 'Untitled'}</a>
-                                        <span style="color:var(--muted);font-size:0.8rem;"> — ${p.journal || p.venue || ''} ${p.year ? '(' + p.year + ')' : ''} ${p.citations ? '• ' + p.citations + ' citations' : ''} ${p.source ? '• ' + p.source : ''}</span>
-                                    </li>`).join('')}
-                            </ul>
-                        ` : '<p style="font-size:0.82rem;color:var(--muted);">No specific papers matched — see the source searches below.</p>'}
-                        ${result.literature ? `
-                            <div style="font-size:0.8rem;color:var(--muted);margin-bottom:4px;">Search these trusted databases:</div>
-                            <div style="display:flex;flex-wrap:wrap;gap:6px;">
-                                ${Object.entries(result.literature).map(([source, data]) =>
-                                    data.link ? `<a href="${data.link}" target="_blank" class="literature-link" style="border:1px solid var(--border);padding:4px 10px;border-radius:8px;text-decoration:none;">${source}${data.count ? ' (' + data.count + ')' : ''}</a>` : ''
-                                ).join('')}
-                            </div>
-                        ` : ''}
-                    </div>
-
-                    <!-- Score Breakdown (Collapsible) -->
-                    <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #ddd;">
-                        <div class="collapsible-header" onclick="toggleCollapsible(this)">
-                            <span><strong>📊 Score Breakdown</strong></span>
-                            <span>▼</span>
-                        </div>
-                        <div class="collapsible-content">
-                            <div style="padding: 12px; background: #f9fafb; border-radius: 8px; font-size: 0.9rem;">
-                                <p><strong>Toxicity:</strong> Base ${result.toxicity_score?.base_score?.toFixed(1)}% → Adjusted ${result.toxicity_score?.adjusted_score?.toFixed(1)}%</p>
-                                <p><strong>Efficacy:</strong> Base ${result.efficiency_score?.base_score?.toFixed(1)}% → Adjusted ${result.efficiency_score?.adjusted_score?.toFixed(1)}%</p>
-                                <p><strong>Evidence:</strong> ${result.efficiency_score?.literature_evidence || 0} papers found</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            `;
-
-            resultsContainer.innerHTML += analysisHtml;
-        }
 
         // Add button event listener
         // (comprehensive button merged into the single Analyze button)

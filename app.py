@@ -655,14 +655,18 @@ class ToxicityPredictor:
         mol_per_kg = 10 ** (-y)
         ld50_mg_kg = mol_per_kg * mw * 1000
         category, ld50_range = self.ld50_mgkg_to_category(ld50_mg_kg)
-        # Confidence reflects the model's benchmark test R2 (~0.55)
+        # Report the model's measured held-out performance, not a derived
+        # "confidence %" — the test R2 and MAE are the numbers a reviewer can
+        # actually check against the published benchmark.
         r2 = (self.ld50_meta or {}).get('test_r2', 0.5)
-        confidence = int(round(55 + 25 * max(0.0, min(1.0, r2))))
+        mae = (self.ld50_meta or {}).get('test_mae', 0.48)
         return {
             'category': category,
             'ld50_range': ld50_range,
             'ld50_mg_kg': round(ld50_mg_kg, 1),
-            'confidence': confidence,
+            'test_r2': round(r2, 2),
+            'test_mae_log': round(mae, 2),
+            'error_band': f"×/÷ {10 ** mae:.1f}",
             'source': 'ml_model',
             'source_detail': (self.ld50_meta or {}).get('source', 'trained model'),
         }
@@ -732,13 +736,15 @@ class ToxicityPredictor:
         category, vehicle_hint = self.logs_to_solubility(logs)
         mg_per_mL = (10 ** logs) * mw          # mol/L * g/mol = g/L = mg/mL
         r2 = (self.solubility_meta or {}).get('test_r2', 0.78)
-        confidence = int(round(55 + 25 * max(0.0, min(1.0, r2))))
+        mae = (self.solubility_meta or {}).get('test_mae', 0.76)
         return {
             'logS': round(logs, 2),
-            'mg_per_mL': round(mg_per_mL, 3),
+            'mg_per_mL': round_sig(mg_per_mL, 2),
             'category': category,              # high / moderate / low
             'vehicle_hint': vehicle_hint,
-            'confidence': confidence,
+            'test_r2': round(r2, 2),
+            'test_mae_log': round(mae, 2),
+            'error_band': f"×/÷ {10 ** mae:.1f}",
             'source': 'ml_model',
             'source_detail': (self.solubility_meta or {}).get('source', 'trained model'),
         }
@@ -777,13 +783,20 @@ class ToxicityPredictor:
                     'source': 'ml_model'}
         category, frequency_hint = self.hours_to_frequency(hours)
         r2 = (self.halflife_meta or {}).get('test_r2', 0.27)
-        # Confidence is deliberately conservative — this model is weak (R2~0.27).
-        confidence = int(round(40 + 40 * max(0.0, min(1.0, r2))))
+        mae = (self.halflife_meta or {}).get('test_mae', 0.40)
+        # This model explains only ~27% of the variance (test MAE 0.40 log units
+        # ~ a factor of 2.5), so the hour value is NOT reported — only the
+        # ordinal band, which is what the dosing-frequency hint actually needs.
         return {
-            'hours': round(hours, 1),
+            'hours': None,
+            'value_withheld': True,
+            'withheld_reason': (
+                f"Model too weak to quote a number (test R² {r2:.2f}, "
+                f"MAE {mae:.2f} log units ≈ a factor of {10 ** mae:.1f}). "
+                "Only the ordinal band is reported."),
             'category': category,          # short / intermediate / long
             'frequency_hint': frequency_hint,
-            'confidence': confidence,
+            'test_r2': round(r2, 2),
             'species': (self.halflife_meta or {}).get('species', 'human'),
             'source': 'ml_model',
             'source_detail': (self.halflife_meta or {}).get('source', 'trained model'),
@@ -823,6 +836,7 @@ class ToxicityPredictor:
                     'source': meta.get('source', ''),
                 })
                 continue
+            auc = round(meta.get('test_auc', 0.75), 2)
             out.append({
                 'key': key,
                 'label': meta.get('label', key),
@@ -831,10 +845,30 @@ class ToxicityPredictor:
                 'flag': 'high' if p >= 0.5 else 'low',
                 'is_risk': key in self._RISK_FLAG_KEYS,
                 'meaning': meta.get('positive_meaning', ''),
-                'auc': round(meta.get('test_auc', 0.75), 2),
+                'auc': auc,
+                'reliability': self.auc_reliability(auc),
                 'source': meta.get('source', ''),
             })
         return out
+
+    @staticmethod
+    def auc_reliability(auc):
+        """Tier a classifier by its held-out AUC so weak models are not shown
+        with the same weight as strong ones."""
+        if auc >= 0.85:
+            return 'good'
+        if auc >= 0.75:
+            return 'moderate'
+        return 'weak'
+
+    @staticmethod
+    def r2_reliability(r2):
+        """Tier a regression model by its held-out R²."""
+        if r2 >= 0.70:
+            return 'good'
+        if r2 >= 0.50:
+            return 'moderate'
+        return 'weak'
 
     def predict_adme_ml(self, smiles, feats=None):
         """Run every loaded ADME regression model on a SMILES (featurized once /
@@ -858,12 +892,16 @@ class ToxicityPredictor:
                             'out_of_domain': True, 'similarity': dom['similarity']})
                 continue
             val = 10 ** p if meta.get('log') else p
+            r2 = round(meta.get('test_r2', 0.5), 2)
+            mae = meta.get('test_mae')
             out.append({
                 'key': key,
                 'label': meta.get('label', key),
-                'value': round(val, 2),
+                'value': round_sig(val, 2),
                 'unit': meta.get('unit', ''),
-                'r2': round(meta.get('test_r2', 0.5), 2),
+                'r2': r2,
+                'reliability': self.r2_reliability(r2),
+                'test_mae': round(mae, 2) if mae is not None else None,
             })
         return out
 
@@ -1041,58 +1079,20 @@ class ToxicityPredictor:
         if ml is not None:
             return ml
 
-        # 3) heuristic fallback
-        heur = self._predict_ld50_heuristic(descriptors)
-        heur['source'] = 'heuristic'
-        heur['source_detail'] = 'molecular-property rules (no data/model available)'
-        return heur
-
-    def _predict_ld50_heuristic(self, descriptors):
-        """
-        LAST-RESORT rule-based LD50 estimate from molecular properties.
-        Used only when neither experimental data nor the trained model apply.
-        Categories (mg/kg): high (<50), moderate (50-500), low (500-2000), very_low (>2000)
-        """
-        mw = descriptors.get('molecular_weight', 300)
-        logp = descriptors.get('logp', 2.0)
-        h_donors = descriptors.get('h_donors', 2)
-        tpsa = descriptors.get('tpsa', 75)
-
-        score = 0
-        if mw > 500:
-            score += 2
-        elif mw > 300:
-            score += 1
-        if 0 < logp < 3:
-            score += 2
-        elif logp < 5:
-            score += 1
-        if h_donors >= 3:
-            score += 1
-        if tpsa > 100:
-            score += 2
-        elif tpsa > 60:
-            score += 1
-
-        if score >= 6:
-            category, ld50_range, confidence = 'very_low', (2000, 99999), 55
-        elif score >= 4:
-            category, ld50_range, confidence = 'low', (500, 2000), 50
-        elif score >= 2:
-            category, ld50_range, confidence = 'moderate', (50, 500), 45
-        else:
-            category, ld50_range, confidence = 'high', (1, 50), 40
-
+        # 3) nothing defensible left. The model returns None either because it
+        # could not featurize the molecule or because the compound is outside
+        # its applicability domain — guessing from molecular-property rules
+        # would defeat that check, so report "not determined" instead.
         return {
-            'category': category,
-            'ld50_range': ld50_range,
-            'confidence': confidence,
-            'score': score,
+            'category': None,
+            'ld50_range': None,
+            'ld50_mg_kg': None,
+            'not_determined': True,
+            'source': 'none',
+            'source_detail': ('No experimental LD50 found, and the compound is '
+                              'outside the trained model\'s applicability domain '
+                              '(or could not be featurized). No estimate is reported.'),
         }
-
-    # Backwards-compatible alias (older callers used predict_ld50_category)
-    def predict_ld50_category(self, descriptors):
-        return self._predict_ld50_heuristic(descriptors)
 
     def predict_organ_toxicity(self, descriptors, weight=25, age=8, route='oral', dose=10):
         """
@@ -1595,11 +1595,25 @@ class ToxicityPredictor:
         
         descriptors = desc_result['descriptors']
         
-        # Step 3: Predict LD50 (HYBRID: real experimental data -> trained ML -> heuristic)
+        # Step 3: Predict LD50 (HYBRID: real experimental data -> trained ML)
         ld50_pred = self.predict_ld50_hybrid(
             drug_name, smiles, descriptors,
             cid=structure.get('cid'), route=route
         )
+        if ld50_pred.get('not_determined'):
+            # Neither a published value nor an in-domain model prediction —
+            # everything downstream would be built on a guess, so stop here
+            # and say so instead.
+            return {
+                'success': True,
+                'drug_name': drug_name,
+                'toxicity_category': None,
+                'not_determined': True,
+                'reason': ld50_pred['source_detail'],
+                'molecular_properties': descriptors,
+                'route': route,
+                'target_organ': target_organ,
+            }
         logger.info(
             f"LD50 for {drug_name}: {ld50_pred.get('ld50_mg_kg', '?')} mg/kg "
             f"[{ld50_pred['category']}] via {ld50_pred.get('source', 'unknown')}"
@@ -1677,7 +1691,8 @@ class ToxicityPredictor:
             'ld50_source': ld50_pred.get('source', 'unknown'),
             'ld50_source_detail': ld50_pred.get('source_detail', ''),
             'experimental_ld50_values': ld50_pred.get('experimental_values', []),
-            'confidence': ld50_pred['confidence'],
+            'test_r2': ld50_pred.get('test_r2'),
+            'error_band': ld50_pred.get('error_band'),
             'organ_toxicity': organ_risks,
             'dose_recommendations': dose_recs,
             'molecular_properties': descriptors,
@@ -1701,700 +1716,18 @@ class ToxicityPredictor:
 # EFFECTIVENESS PREDICTION
 # ============================================================================
 
-class EffectivenessPredictor:
-    """
-    Predict drug effectiveness using bioactivity data and literature.
-    Integrates with existing search functions.
-    """
-    
-    def __init__(self):
-        self.cache = None  # Will be set after api_cache is initialized
-        logger.info("EffectivenessPredictor initialized")
-    
-    def search_target_activity(self, drug_name, target_organ=None):
-        """Search ChEMBL for target activity data."""
-        cache_key = {'drug': drug_name.lower(), 'target': target_organ or 'general'}
-        if self.cache:
-            cached = self.cache.get('chembl_activity', cache_key)
-            if cached:
-                return cached
-        
-        try:
-            # Search ChEMBL for compound
-            search_url = f"{Config.CHEMBL_BASE}/molecule/search.json"
-            response = requests.get(search_url, params={'q': drug_name, 'limit': 1},
-                                  timeout=Config.CHEMBL_TIMEOUT)
-            response.raise_for_status()
-            
-            data = response.json()
-            molecules = data.get('molecules', [])
-            
-            if not molecules:
-                return {'success': False, 'error': 'No data found'}
-            
-            chembl_id = molecules[0]['molecule_chembl_id']
-            
-            # Get bioactivity data
-            activity_url = f"{Config.CHEMBL_BASE}/activity.json"
-            params = {
-                'molecule_chembl_id': chembl_id,
-                'limit': 100
-            }
-            
-            response = requests.get(activity_url, params=params, timeout=Config.CHEMBL_TIMEOUT)
-            response.raise_for_status()
-            
-            activity_data = response.json()
-            activities = activity_data.get('activities', [])
-            
-            # Extract IC50/EC50 values
-            potency_values = []
-            for activity in activities:
-                if activity.get('standard_type') in ['IC50', 'EC50', 'Ki']:
-                    value = activity.get('standard_value')
-                    if value:
-                        try:
-                            potency_values.append(float(value))
-                        except:
-                            pass
-            
-            result = {
-                'success': True,
-                'chembl_id': chembl_id,
-                'num_activities': len(activities),
-                'potency_values': potency_values,
-                'median_potency': np.median(potency_values) if potency_values else None
-            }
-            
-            if self.cache:
-                self.cache.set('chembl_activity', cache_key, result)
-            return result
-            
-        except Exception as e:
-            logger.error(f"ChEMBL activity search failed: {e}")
-            return {'success': False, 'error': str(e)}
-    
-    def predict_efficacy_from_potency(self, potency_values):
-        """Predict efficacy category from IC50/EC50 values."""
-        if not potency_values:
-            return {
-                'category': 'unknown',
-                'confidence': 0,
-                'note': 'No potency data available'
-            }
-        
-        median_potency = np.median(potency_values)  # nM units
-        
-        # Classify based on median potency
-        if median_potency < 10:
-            category = 'very_high'
-            confidence = 85
-        elif median_potency < 100:
-            category = 'high'
-            confidence = 75
-        elif median_potency < 1000:
-            category = 'moderate'
-            confidence = 65
-        elif median_potency < 10000:
-            category = 'low'
-            confidence = 55
-        else:
-            category = 'very_low'
-            confidence = 50
-        
-        return {
-            'category': category,
-            'median_potency_nM': median_potency,
-            'confidence': confidence,
-            'num_datapoints': len(potency_values)
-        }
-    
-    def search_clinical_efficacy(self, drug_name, condition=None):
-        """Mine PubMed for efficacy reports using existing function."""
-        # Use existing PubMed search
-        group = {'drug_name': drug_name, 'target_organ': condition or ''}
-        papers = search_pubmed_articles(group, max_results=20)
-        
-        # Count positive/negative outcomes in abstracts/titles
-        positive_keywords = ['effective', 'improved', 'beneficial', 'significant improvement']
-        negative_keywords = ['ineffective', 'no effect', 'failed', 'not significant']
-        
-        positive_count = 0
-        negative_count = 0
-        
-        for paper in papers:
-            title = paper.get('title', '').lower()
-            
-            if any(kw in title for kw in positive_keywords):
-                positive_count += 1
-            if any(kw in title for kw in negative_keywords):
-                negative_count += 1
-        
-        total = positive_count + negative_count
-        success_rate = (positive_count / total * 100) if total > 0 else 50
-        
-        return {
-            'total_papers': len(papers),
-            'positive_outcomes': positive_count,
-            'negative_outcomes': negative_count,
-            'success_rate_percent': round(success_rate, 1),
-            'papers': papers[:5]  # Top 5 papers
-        }
-    
-    def predict_optimal_dose(self, efficacy_data, toxicity_category=None):
-        """Estimate optimal therapeutic dose range."""
-        median_potency = efficacy_data.get('median_potency_nM')
-        
-        if not median_potency:
-            return {
-                'starting_dose': '1-10 mg/kg',
-                'max_dose': '50 mg/kg',
-                'note': 'Based on typical ranges - no potency data'
-            }
-        
-        # Convert in vitro potency to in vivo estimate (rough multiplier)
-        # Typical multiplier: 100-1000x for in vivo vs in vitro
-        in_vivo_estimate_low = (median_potency / 1000) * 0.1  # mg/kg
-        in_vivo_estimate_high = (median_potency / 1000) * 1.0  # mg/kg
-        
-        # Adjust based on toxicity if provided
-        if toxicity_category in ['high', 'moderate']:
-            in_vivo_estimate_low *= 0.5
-            in_vivo_estimate_high *= 0.5
-        
-        return {
-            'starting_dose': f"{max(0.1, in_vivo_estimate_low):.1f}-{in_vivo_estimate_high:.1f} mg/kg",
-            'max_dose': f"{in_vivo_estimate_high * 5:.1f} mg/kg",
-            'based_on': f'In vitro potency {median_potency:.0f} nM'
-        }
-    
-    def adjust_efficacy_for_mouse_parameters(self, efficacy_pred, dose, weight, age, route, target_organ):
-        """
-        Adjust efficacy prediction based on mouse-specific parameters.
-        Returns adjusted efficacy score (0-100) and category.
-        """
-        # Base efficacy score from prediction
-        base_scores = {
-            'very_high': 90,
-            'high': 75,
-            'moderate': 50,
-            'low': 30,
-            'very_low': 15,
-            'unknown': 40
-        }
-        efficacy_score = base_scores.get(efficacy_pred.get('category', 'unknown'), 40)
-        
-        # === Dose adjustments ===
-        # Assume optimal dose is around 10 mg/kg (adjust based on your needs)
-        optimal_dose_low = 5
-        optimal_dose_high = 50
-        
-        if dose < optimal_dose_low:
-            # Sub-therapeutic dose
-            dose_factor = (dose / optimal_dose_low)  # 0-1
-            efficacy_score *= dose_factor
-        elif dose > optimal_dose_high:
-            # Supra-therapeutic dose (diminishing returns)
-            excess_ratio = (dose - optimal_dose_high) / optimal_dose_high
-            efficacy_score *= (1 - min(0.3, excess_ratio * 0.1))
-        
-        # === Age adjustments ===
-        if age < 6:
-            # Young mice - immature target systems
-            efficacy_score *= 0.85
-        elif age > 18:
-            # Old mice - altered pharmacodynamics
-            efficacy_score *= 0.9
-        
-        # === Weight adjustments ===
-        if weight < 20:
-            # Smaller mice may have different volume of distribution
-            efficacy_score *= 0.95
-        elif weight > 35:
-            # Larger mice
-            efficacy_score *= 0.97
-        
-        # === Route adjustments (bioavailability) ===
-        route_bioavailability = {
-            'iv': 1.0,      # 100% bioavailability
-            'ip': 0.95,     # ~95%
-            'sc': 0.9,      # ~90%
-            'im': 0.9,      # ~90%
-            'oral': 0.6,    # ~60% (first-pass metabolism)
-            'icv': 1.0      # Direct CNS
-        }
-        bioavail = route_bioavailability.get(route.lower(), 0.7)
-        efficacy_score *= bioavail
-        
-        # === Target organ accessibility ===
-        if target_organ:
-            target_lower = target_organ.lower()
-            
-            # Brain/CNS - BBB barrier
-            if 'brain' in target_lower or 'cns' in target_lower or 'neuro' in target_lower:
-                if route.lower() == 'icv':
-                    efficacy_score *= 1.2  # Direct CNS access
-                elif route.lower() == 'oral':
-                    efficacy_score *= 0.7  # BBB limitation
-            
-            # Liver - high first-pass for oral
-            elif 'liver' in target_lower or 'hepatic' in target_lower:
-                if route.lower() == 'oral':
-                    efficacy_score *= 1.1  # Good liver exposure
-            
-            # Kidney
-            elif 'kidney' in target_lower or 'renal' in target_lower:
-                efficacy_score *= 0.95  # Renal clearance may reduce efficacy
-            
-            # Tumor
-            elif 'tumor' in target_lower or 'cancer' in target_lower:
-                efficacy_score *= 0.8  # Tumor penetration challenge
-        
-        # Ensure bounds
-        efficacy_score = max(0, min(100, efficacy_score))
-        
-        # Classify adjusted efficacy
-        if efficacy_score >= 80:
-            efficacy_category = 'excellent'
-        elif efficacy_score >= 65:
-            efficacy_category = 'good'
-        elif efficacy_score >= 45:
-            efficacy_category = 'moderate'
-        elif efficacy_score >= 25:
-            efficacy_category = 'low'
-        else:
-            efficacy_category = 'very_low'
-        
-        # Calculate success probability
-        success_probability = min(95, efficacy_score)
-        
-        return {
-            'efficacy_score': round(efficacy_score, 1),
-            'efficacy_category': efficacy_category,
-            'success_probability': round(success_probability, 1),
-            'optimal_dose_low': optimal_dose_low,
-            'optimal_dose_high': optimal_dose_high,
-            'bioavailability_factor': bioavail,
-            'adjustments_applied': {
-                'dose': dose < optimal_dose_low or dose > optimal_dose_high,
-                'age': age < 6 or age > 18,
-                'weight': weight < 20 or weight > 35,
-                'route': bioavail < 1.0,
-                'target_accessibility': bool(target_organ)
-            }
-        }
-    
-    def calculate_expected_response_time(self, route, target_organ, dose):
-        """
-        Estimate expected time to effect based on route and target.
-        """
-        # Base response times (in days)
-        route_times = {
-            'iv': (1, 3, 7),        # (onset, peak, duration)
-            'ip': (2, 5, 10),
-            'sc': (3, 7, 14),
-            'im': (3, 7, 14),
-            'oral': (5, 10, 21),
-            'icv': (1, 2, 5)
-        }
-        
-        onset, peak, duration = route_times.get(route.lower(), (5, 10, 21))
-        
-        # Adjust for target organ
-        if target_organ:
-            target_lower = target_organ.lower()
-            
-            # CNS effects may take longer
-            if 'brain' in target_lower or 'neuro' in target_lower:
-                onset *= 1.5
-                peak *= 1.5
-                duration *= 1.2
-            
-            # Metabolic changes slow
-            elif 'metabolic' in target_lower or 'diabetes' in target_lower:
-                onset *= 2
-                peak *= 2
-                duration *= 1.5
-            
-            # Acute inflammation faster
-            elif 'inflammation' in target_lower or 'pain' in target_lower:
-                onset *= 0.7
-                peak *= 0.8
-        
-        # Convert to readable format
-        def days_to_str(days):
-            if days < 7:
-                return f"{int(days)} days"
-            else:
-                return f"{int(days/7)} weeks"
-        
-        return {
-            'time_to_effect': days_to_str(onset),
-            'peak_effect': days_to_str(peak),
-            'duration': days_to_str(duration)
-        }
-    
-    def estimate_pk_factors(self, route, weight, age):
-        """
-        Estimate pharmacokinetic factors affecting efficacy.
-        """
-        # Volume of distribution (mL) - roughly correlates with body weight
-        vd = weight * 2.5  # Typical Vd ~ 2.5 mL/g for water-soluble drugs
-        
-        # Clearance adjustments
-        clearance_factor = 1.0
-        
-        if age < 6:
-            clearance_factor = 0.7  # Immature metabolism
-        elif age > 18:
-            clearance_factor = 0.6  # Reduced metabolism
-        
-        if weight < 20:
-            clearance_factor *= 0.9
-        
-        # Half-life estimate (hours) - route dependent
-        route_halflife = {
-            'iv': 2,
-            'ip': 3,
-            'sc': 4,
-            'im': 4,
-            'oral': 3,
-            'icv': 6
-        }
-        half_life = route_halflife.get(route.lower(), 3)
-        half_life /= clearance_factor  # Adjust for age/weight
-        
-        # Dosing frequency recommendation
-        if half_life < 4:
-            dosing_frequency = 'Twice daily'
-        elif half_life < 12:
-            dosing_frequency = 'Once daily'
-        else:
-            dosing_frequency = 'Every 2-3 days'
-        
-        return {
-            'volume_of_distribution_mL': round(vd, 1),
-            'estimated_half_life_hours': round(half_life, 1),
-            'clearance_factor': clearance_factor,
-            'recommended_dosing': dosing_frequency,
-            'steady_state_days': round((half_life * 5) / 24, 1)  # 5 half-lives to steady state
-        }
-    
-    def predict_effectiveness_comprehensive(self, drug_name, condition=None, target_organ=None,
-                                           weight=25, age=8, dose=10, route='oral'):
-        """
-        Main effectiveness prediction function with mouse-specific parameters.
-        
-        Args:
-            drug_name: Name of the drug
-            condition: Medical condition being treated
-            target_organ: Target organ/system
-            weight: Mouse weight in grams
-            age: Mouse age in weeks
-            dose: Dose in mg/kg
-            route: Administration route
-        
-        Returns comprehensive efficacy assessment.
-        """
-        logger.info(f"Predicting effectiveness for: {drug_name} (dose={dose} mg/kg, route={route}, target={target_organ})")
-        
-        # Step 1: Search target activity
-        activity = self.search_target_activity(drug_name, target_organ)
-        
-        # Step 2: Predict efficacy from potency
-        if activity['success'] and activity.get('potency_values'):
-            efficacy_pred = self.predict_efficacy_from_potency(activity['potency_values'])
-        else:
-            efficacy_pred = {
-                'category': 'unknown',
-                'confidence': 0,
-                'median_potency_nM': None
-            }
-        
-        # Step 3: Adjust efficacy based on mouse parameters
-        adjusted_efficacy = self.adjust_efficacy_for_mouse_parameters(
-            efficacy_pred, dose, weight, age, route, target_organ
-        )
-        
-        # Step 4: Search clinical efficacy in literature
-        lit_efficacy = self.search_clinical_efficacy(drug_name, condition)
-        
-        # Step 5: Combine confidence scores
-        combined_confidence = (efficacy_pred.get('confidence', 0) +
-                             (lit_efficacy['success_rate_percent'] if lit_efficacy['total_papers'] > 0 else 0)) / 2
-        
-        # Step 6: Predict optimal dose
-        dose_pred = self.predict_optimal_dose(efficacy_pred)
-        
-        # Step 7: Calculate expected response time based on route and organ
-        expected_response = self.calculate_expected_response_time(route, target_organ, dose)
-        
-        # Step 8: Bioavailability and pharmacokinetic considerations
-        pk_factors = self.estimate_pk_factors(route, weight, age)
-        
-        # Step 9: Generate recommendations
-        recommendations = []
-        
-        if adjusted_efficacy['efficacy_score'] > 80:
-            recommendations.append("✓ EXCELLENT efficacy predicted - strong candidate for testing")
-        elif adjusted_efficacy['efficacy_score'] > 60:
-            recommendations.append("✓ GOOD efficacy predicted - recommended for testing")
-        elif adjusted_efficacy['efficacy_score'] > 40:
-            recommendations.append("⚠ MODERATE efficacy - consider dose optimization")
-        else:
-            recommendations.append("⚠ LOW efficacy predicted - may not justify animal testing")
-        
-        # Dose-specific recommendations
-        if dose < adjusted_efficacy.get('optimal_dose_low', 0):
-            recommendations.append(f"⚠ Current dose ({dose} mg/kg) may be sub-therapeutic - consider increasing")
-        elif dose > adjusted_efficacy.get('optimal_dose_high', 999):
-            recommendations.append(f"⚠ Current dose ({dose} mg/kg) may exceed optimal range - risk of toxicity without added benefit")
-        
-        # Age-specific recommendations
-        if age < 6:
-            recommendations.append("⚠ Young mice - efficacy may vary due to immature target systems")
-        elif age > 18:
-            recommendations.append("⚠ Aged mice - reduced drug metabolism may enhance efficacy but increase toxicity")
-        
-        # Route-specific recommendations
-        if route.lower() == 'oral' and target_organ and 'brain' in target_organ.lower():
-            recommendations.append("⚠ Oral route for CNS target - verify BBB permeability")
-        elif route.lower() == 'iv':
-            recommendations.append("✓ IV route - ensures maximum bioavailability")
-        
-        return {
-            'success': True,
-            'drug_name': drug_name,
-            'efficacy_prediction': efficacy_pred['category'],
-            'adjusted_efficacy': adjusted_efficacy,
-            'confidence': round(combined_confidence, 1),
-            'median_potency_nM': efficacy_pred.get('median_potency_nM'),
-            'chembl_data': activity,
-            'literature_data': lit_efficacy,
-            'dose_recommendations': dose_pred,
-            'expected_outcomes': {
-                'time_to_effect': expected_response['time_to_effect'],
-                'peak_effect': expected_response['peak_effect'],
-                'duration_of_action': expected_response['duration'],
-                'effect_magnitude': adjusted_efficacy['efficacy_category']
-            },
-            'pk_factors': pk_factors,
-            'recommendations': recommendations,
-            'condition': condition,
-            'target_organ': target_organ,
-            'mouse_parameters': {
-                'weight_g': weight,
-                'age_weeks': age,
-                'dose_mg_kg': dose,
-                'route': route
-            },
-            'efficacy_score': adjusted_efficacy['efficacy_score'],
-            'likelihood_of_success': adjusted_efficacy['success_probability']
-        }
 
 
 # ============================================================================
 # DECISION SUPPORT SYSTEM
 # ============================================================================
 
-def generate_overall_assessment(toxicity_result, effectiveness_result):
-    """Generate overall drug assessment combining toxicity and efficacy."""
-    
-    # Score toxicity (lower is better)
-    tox_category = toxicity_result.get('toxicity_category', 'moderate')
-    tox_scores = {'very_low': 5, 'low': 4, 'moderate': 3, 'high': 2}
-    tox_score = tox_scores.get(tox_category, 3)
-    
-    # Score efficacy (higher is better)
-    eff_category = effectiveness_result.get('efficacy_prediction', 'moderate')
-    eff_scores = {'very_high': 5, 'high': 4, 'moderate': 3, 'low': 2, 'very_low': 1, 'unknown': 2}
-    eff_score = eff_scores.get(eff_category, 3)
-    
-    # Combined score (0-10)
-    combined_score = tox_score + eff_score
-    
-    # Rating system
-    if combined_score >= 9:
-        rating = "⭐⭐⭐⭐⭐ EXCELLENT CANDIDATE"
-        recommendation = "Highly recommended for further investigation"
-    elif combined_score >= 7:
-        rating = "⭐⭐⭐⭐ GOOD CANDIDATE"
-        recommendation = "Recommended for testing with standard precautions"
-    elif combined_score >= 5:
-        rating = "⭐⭐⭐ MODERATE CANDIDATE"
-        recommendation = "Proceed with caution - monitor closely"
-    elif combined_score >= 3:
-        rating = "⭐⭐ POOR CANDIDATE"
-        recommendation = "Not recommended - high risk/low benefit"
-    else:
-        rating = "⭐ UNSUITABLE"
-        recommendation = "Do not proceed with animal testing"
-    
-    # Risk-benefit ratio
-    risk_benefit = calculate_risk_benefit(tox_category, eff_category)
-    
-    return {
-        'rating': rating,
-        'recommendation': recommendation,
-        'combined_score': combined_score,
-        'toxicity_score': tox_score,
-        'efficacy_score': eff_score,
-        'risk_benefit_ratio': risk_benefit
-    }
 
 
-def calculate_risk_benefit(toxicity_category, efficacy_category):
-    """Calculate risk-benefit ratio."""
-    
-    # Benefit score
-    benefit_map = {'very_high': 5, 'high': 4, 'moderate': 3, 'low': 2, 'very_low': 1, 'unknown': 2}
-    benefit = benefit_map.get(efficacy_category, 2)
-    
-    # Risk score
-    risk_map = {'very_low': 1, 'low': 2, 'moderate': 3, 'high': 4}
-    risk = risk_map.get(toxicity_category, 3)
-    
-    ratio = benefit / risk if risk > 0 else 0
-    
-    if ratio > 2:
-        assessment = "Favorable - Benefits strongly outweigh risks"
-    elif ratio > 1:
-        assessment = "Acceptable - Benefits outweigh risks"
-    elif ratio > 0.5:
-        assessment = "Marginal - Benefits and risks are balanced"
-    else:
-        assessment = "Unfavorable - Risks outweigh benefits"
-    
-    return {
-        'ratio': round(ratio, 2),
-        'assessment': assessment,
-        'benefit_score': benefit,
-        'risk_score': risk
-    }
 
 
-def calculate_therapeutic_window(tox_result, eff_result, current_dose):
-    """
-    Calculate therapeutic window and safety margin.
-    
-    Args:
-        tox_result: Toxicity prediction result
-        eff_result: Effectiveness prediction result
-        current_dose: Current dose in mg/kg
-    
-    Returns:
-        Therapeutic window analysis
-    """
-    # Get dose-adjusted toxicity data
-    dose_adj_tox = tox_result.get('dose_adjusted_toxicity', {})
-    safety_margin = dose_adj_tox.get('safety_margin', 10)
-    
-    # Get efficacy data
-    efficacy_score = eff_result.get('efficacy_score', 50)
-    adjusted_efficacy = eff_result.get('adjusted_efficacy', {})
-    
-    # Calculate therapeutic index (TI = TD50/ED50)
-    # Approximate ED50 from efficacy data
-    if efficacy_score > 60:
-        estimated_ed50 = current_dose * 0.8  # Close to effective dose
-    else:
-        estimated_ed50 = current_dose * 1.5  # May need higher dose
-    
-    # TD50 from LD50 estimate (typically TD50 ~ 0.1 * LD50)
-    ld50_estimate = dose_adj_tox.get('ld50_estimate', current_dose * 10)
-    estimated_td50 = ld50_estimate * 0.1
-    
-    therapeutic_index = estimated_td50 / estimated_ed50 if estimated_ed50 > 0 else 1
-    
-    # Classify therapeutic window
-    if therapeutic_index > 10:
-        window_class = 'wide'
-        window_assessment = 'WIDE therapeutic window - Safe for clinical use'
-    elif therapeutic_index > 5:
-        window_class = 'moderate'
-        window_assessment = 'MODERATE therapeutic window - Careful dosing required'
-    elif therapeutic_index > 2:
-        window_class = 'narrow'
-        window_assessment = 'NARROW therapeutic window - Dose monitoring essential'
-    else:
-        window_class = 'very_narrow'
-        window_assessment = 'VERY NARROW therapeutic window - High risk, consider alternatives'
-    
-    # Dose recommendations
-    if efficacy_score < 40:
-        dose_recommendation = f"Consider increasing dose to {current_dose * 1.5:.1f} mg/kg to improve efficacy"
-    elif safety_margin < 5:
-        dose_recommendation = f"Consider reducing dose to {current_dose * 0.7:.1f} mg/kg to improve safety"
-    else:
-        dose_recommendation = f"Current dose ({current_dose} mg/kg) appears optimal"
-    
-    return {
-        'therapeutic_index': round(therapeutic_index, 2),
-        'window_class': window_class,
-        'window_assessment': window_assessment,
-        'estimated_ed50': round(estimated_ed50, 2),
-        'estimated_td50': round(estimated_td50, 2),
-        'current_dose': current_dose,
-        'safety_margin': safety_margin,
-        'efficacy_at_current_dose': efficacy_score,
-        'dose_recommendation': dose_recommendation,
-        'optimal_dose_range': {
-            'min': round(estimated_ed50 * 0.8, 2),
-            'max': round(estimated_td50 * 0.5, 2),  # Stay well below toxic dose
-            'recommended': round((estimated_ed50 * 1.2 + estimated_td50 * 0.3) / 2, 2)
-        }
-    }
 
 
-def assess_study_feasibility(toxicity_result, effectiveness_result):
-    """Assess whether animal study should proceed."""
-    
-    tox_cat = toxicity_result.get('toxicity_category', 'moderate')
-    eff_cat = effectiveness_result.get('efficacy_prediction', 'moderate')
-    
-    concerns = []
-    modifications = []
-    recommended = True
-    
-    # Check toxicity concerns
-    if tox_cat == 'high':
-        concerns.append("High toxicity predicted")
-        modifications.append("Use lower starting dose (10% of predicted safe dose)")
-        modifications.append("Implement daily health monitoring")
-        modifications.append("Have veterinary support on standby")
-    elif tox_cat == 'moderate':
-        modifications.append("Weekly health monitoring recommended")
-    
-    # Check efficacy concerns
-    if eff_cat in ['very_low', 'low']:
-        concerns.append("Low efficacy predicted")
-        modifications.append("Consider alternative compounds with better predicted efficacy")
-        if eff_cat == 'very_low':
-            recommended = False
-            concerns.append("CRITICAL: Very low efficacy - animal study not justified")
-    
-    # Combined assessment
-    if tox_cat == 'high' and eff_cat in ['low', 'very_low']:
-        recommended = False
-        concerns.append("CRITICAL: High risk + Low benefit = Study not recommended")
-    
-    # Calculate animals potentially saved
-    if not recommended:
-        animals_saved = 50  # Typical study size
-    else:
-        # Even if proceeding, optimized design saves animals
-        if tox_cat in ['very_low', 'low'] and eff_cat in ['very_high', 'high']:
-            animals_saved = 10  # Can use smaller N with strong signal
-        else:
-            animals_saved = 20  # Moderate savings from optimization
-    
-    return {
-        'recommended': recommended,
-        'concerns': concerns,
-        'modifications': modifications,
-        'animals_saved': animals_saved,
-        'confidence': (toxicity_result.get('confidence', 0) + effectiveness_result.get('confidence', 0)) / 2
-    }
 
 
 # ============================================================================
@@ -2452,9 +1785,6 @@ api_cache = APICache()
 # Initialize prediction engines
 toxicity_predictor = ToxicityPredictor()
 toxicity_predictor.cache = api_cache  # Connect to cache system
-
-effectiveness_predictor = EffectivenessPredictor()
-effectiveness_predictor.cache = api_cache  # Connect to cache system
 
 # ============================================================================
 # RATE LIMITING FOR EXTERNAL APIs
@@ -3651,8 +2981,9 @@ def get_prediction_and_suggestion(group, all_groups_count=1):
 
     def build_summary(recommended_range):
         """A clear, simple recommendation summary for the UI."""
-        # Real toxicity % from LD50 (experimental first, then model estimate)
-        tox_pct = tox_cat = ld50_val = tox_source = None
+        # GHS acute-toxicity class from the LD50 (experimental first, then model
+        # estimate). No invented percentage — only the published GHS band.
+        ghs = tox_cat = ld50_val = tox_source = None
         if not is_control:
             try:
                 if _private:
@@ -3668,8 +2999,15 @@ def get_prediction_and_suggestion(group, all_groups_count=1):
                 if info.get('found'):
                     ld50_val = info['ld50_mg_kg']
                     tox_cat = info['category']
-                    tox_pct = round(ld50_to_toxicity_percentage(ld50_val), 1)
+                    ghs = ld50_to_ghs(ld50_val)
                     tox_source = info.get('source')  # 'experimental' or 'ml_model'
+                    # An LD50 the model inferred carries a wide error band
+                    # (test MAE 0.48 log units ~ a factor of 3), so it is
+                    # reported to 2 significant figures with that band stated.
+                    if tox_source == 'ml_model':
+                        ld50_val = round_sig(ld50_val, 2)
+                    else:
+                        ld50_val = round_sig(ld50_val, 3)
             except Exception as e:
                 logger.warning(f"Summary toxicity lookup failed for {drug}: {e}")
 
@@ -3680,10 +3018,15 @@ def get_prediction_and_suggestion(group, all_groups_count=1):
             try:
                 dose_val = parse_float_safe(group.get('dose'), 0)
                 pct_ld50 = (dose_val / ld50_val * 100) if (ld50_val and dose_val) else 0
-                risk_proxy = tox_pct if tox_pct is not None else 40
+                # With no toxicity data we fall back to a generic moderate
+                # setting; `evidence_based` tells the UI to say so plainly
+                # rather than let a placeholder pass as a finding.
+                risk_proxy = ghs['risk_score'] if ghs else 40
                 welfare = toxicity_predictor.generate_welfare_recommendations(
                     risk_proxy, pct_ld50=pct_ld50,
                     target_organ=group.get('target_organ'))
+                if welfare is not None:
+                    welfare['evidence_based'] = ghs is not None
             except Exception as e:
                 logger.warning(f"Welfare recommendation failed for {drug}: {e}")
         # Recommended tissues/samples to collect, based on the chosen toxicity
@@ -3842,10 +3185,12 @@ def get_prediction_and_suggestion(group, all_groups_count=1):
             'samples': group.get('sample_types', []),
             'blood_volume_ml': blood_calc.get('total_volume_ml') if blood_calc.get('needed') else None,
             'blood_safe': (blood_calc.get('safety_color') == 'green') if blood_calc.get('needed') else None,
-            'toxicity_percentage': tox_pct,
+            'ghs': ghs,                     # published GHS acute-toxicity band
             'toxicity_category': tox_cat,
             'ld50_mg_kg': ld50_val,
             'toxicity_source': tox_source,  # experimental vs ml_model (estimate)
+            'ld50_error_band': ('×/÷ 3 (model test MAE 0.48 log units)'
+                                if tox_source == 'ml_model' else None),
             'solubility': solubility,       # ML aqueous-solubility estimate (vehicle hint)
             'halflife': halflife,           # ML half-life estimate (human PK; frequency hint)
             'safe_dose': safe_dose,         # LD50-derived safer-dosing guidance (safety margin)
@@ -4196,238 +3541,9 @@ def get_prediction_and_suggestion(group, all_groups_count=1):
 # ENHANCED PDF GENERATION WITH DIAGRAMS
 # ============================================================================
 
-def create_power_curve_chart(power_curve_data, width=400, height=200):
-    """Create power curve chart for PDF."""
-    drawing = Drawing(width, height)
-    
-    chart = HorizontalLineChart()
-    chart.x = 50
-    chart.y = 50
-    chart.height = height - 70
-    chart.width = width - 100
-    
-    sample_sizes = power_curve_data['sample_sizes']
-    powers = power_curve_data['powers']
-    
-    chart.data = [[p * 100 for p in powers]]
-    chart.categoryAxis.categoryNames = [str(int(s)) for s in sample_sizes[::3]]
-    chart.categoryAxis.labels.boxAnchor = 'n'
-    chart.categoryAxis.labels.angle = 45
-    chart.categoryAxis.labels.fontSize = 8
-    
-    chart.valueAxis.valueMin = 0
-    chart.valueAxis.valueMax = 100
-    chart.valueAxis.valueStep = 20
-    chart.valueAxis.labels.fontSize = 8
-    
-    chart.lines[0].strokeColor = HexColor('#26a65b')
-    chart.lines[0].strokeWidth = 2
-    
-    # Add 80% power reference line
-    line = Line(50, 50 + (height-70)*0.8, width-50, 50 + (height-70)*0.8)
-    line.strokeColor = colors.red
-    line.strokeWidth = 1
-    line.strokeDashArray = [3, 3]
-    drawing.add(line)
-    
-    # Add label
-    label = String(width/2, height-20, "Statistical Power vs Sample Size", textAnchor='middle')
-    label.fontSize = 10
-    label.fontName = 'Helvetica-Bold'
-    drawing.add(label)
-    
-    drawing.add(chart)
-    return drawing
 
-def create_timeline_diagram(groups, width=500, height=180):
-    """Create visual study timeline with colored phases and dates."""
-    drawing = Drawing(width, height)
-    
-    # Title
-    title = String(width/2, height-15, "Study Timeline", textAnchor='middle')
-    title.fontSize = 14
-    title.fontName = 'Helvetica-Bold'
-    title.fillColor = HexColor('#1f8f4e')
-    drawing.add(title)
-    
-    # Timeline configuration
-    timeline_y = height/2 + 10
-    timeline_start = 40
-    timeline_end = width - 40
-    timeline_length = timeline_end - timeline_start
-    bar_height = 50
-    
-    # Calculate dates
-    start_date = datetime.now()
-    
-    # Phase definitions (proportional widths with actual dates)
-    phases = [
-        {'name': 'Phase 1', 'title': 'Acclimation', 'weeks': 2, 'proportion': 0.17, 'color': '#4CAF50', 'start': start_date},
-        {'name': 'Phase 2', 'title': 'Baseline', 'weeks': 1, 'proportion': 0.08, 'color': '#2196F3', 'start': start_date + timedelta(weeks=2)},
-        {'name': 'Phase 3', 'title': 'Treatment', 'weeks': 6, 'proportion': 0.5, 'color': '#FF9800', 'start': start_date + timedelta(weeks=3)},
-        {'name': 'Phase 4', 'title': 'Analysis', 'weeks': 3, 'proportion': 0.25, 'color': '#9C27B0', 'start': start_date + timedelta(weeks=9)}
-    ]
-    
-    # Draw colored phase bars with dates
-    current_x = timeline_start
-    for phase in phases:
-        phase_width = timeline_length * phase['proportion']
-        
-        # Phase bar
-        bar = Rect(current_x, timeline_y - bar_height/2, phase_width, bar_height)
-        bar.fillColor = HexColor(phase['color'])
-        bar.strokeColor = colors.white
-        bar.strokeWidth = 2
-        drawing.add(bar)
-        
-        # Phase name
-        label_x = current_x + phase_width/2
-        label = String(label_x, timeline_y + 8, phase['title'], textAnchor='middle')
-        label.fontSize = 10
-        label.fontName = 'Helvetica-Bold'
-        label.fillColor = colors.white
-        drawing.add(label)
-        
-        # Duration
-        duration = String(label_x, timeline_y - 2, f"{phase['weeks']}w", textAnchor='middle')
-        duration.fontSize = 9
-        duration.fillColor = colors.white
-        drawing.add(duration)
-        
-        # Start date below bar
-        date_str = phase['start'].strftime('%b %d')
-        date_label = String(current_x + 2, timeline_y - bar_height/2 - 12, date_str, textAnchor='start')
-        date_label.fontSize = 7
-        date_label.fillColor = HexColor('#555555')
-        drawing.add(date_label)
-        
-        current_x += phase_width
-    
-    # End date
-    end_date = start_date + timedelta(weeks=12)
-    end_label = String(timeline_end - 2, timeline_y - bar_height/2 - 12, end_date.strftime('%b %d'), textAnchor='end')
-    end_label.fontSize = 7
-    end_label.fillColor = HexColor('#555555')
-    drawing.add(end_label)
-    
-    return drawing
 
-def create_enhanced_timeline_diagram(phases, width=450, height=60):
-    """Create a clean, horizontal timeline bar with one phase per group, proportional to duration."""
-    drawing = Drawing(width, height)
-    
-    if not phases:
-        # Empty message if no phases
-        text = String(width/2, height/2, "No groups defined", textAnchor='middle')
-        text.fontSize = 10
-        drawing.add(text)
-        return drawing
-    
-    # Timeline configuration
-    bar_y = 20
-    bar_start_x = 10
-    bar_end_x = width - 10
-    bar_width = bar_end_x - bar_start_x
-    bar_height = 35
-    
-    # Dynamic phase colors (cycle through colors if more than 4 groups)
-    base_colors = ['#4CAF50', '#2196F3', '#FF9800', '#9C27B0', '#E91E63', '#00BCD4', '#FF5722', '#9E9E9E']
-    
-    num_phases = len(phases)
-    
-    # Calculate total weeks across all phases
-    total_weeks = sum([p.get('duration_weeks', 6) for p in phases])
-    
-    if total_weeks == 0:
-        total_weeks = num_phases * 6  # Fallback
-    
-    # Draw phase bars proportional to their duration
-    current_x = bar_start_x
-    for idx, phase in enumerate(phases):
-        color = base_colors[idx % len(base_colors)]
-        
-        # Calculate proportional width based on duration
-        phase_weeks = phase.get('duration_weeks', 6)
-        phase_proportion = phase_weeks / total_weeks
-        phase_width = bar_width * phase_proportion
-        
-        # Draw rectangle
-        rect = Rect(current_x, bar_y, phase_width, bar_height)
-        rect.fillColor = HexColor(color)
-        rect.strokeColor = colors.white
-        rect.strokeWidth = 1.5
-        drawing.add(rect)
-        
-        # Add phase number label centered (smaller font for many groups)
-        label_x = current_x + phase_width / 2
-        label_font_size = 9 if num_phases <= 4 else 7
-        label = String(label_x, bar_y + bar_height/2 + 3, f"P{idx + 1}", textAnchor='middle')
-        label.fontSize = label_font_size
-        label.fontName = 'Helvetica-Bold'
-        label.fillColor = colors.white
-        drawing.add(label)
-        
-        # Add duration below label (show actual weeks)
-        duration_font_size = 7 if num_phases <= 4 else 6
-        duration_label = String(label_x, bar_y + bar_height/2 - 8, f"{phase_weeks}w", textAnchor='middle')
-        duration_label.fontSize = duration_font_size
-        duration_label.fillColor = colors.white
-        drawing.add(duration_label)
-        
-        current_x += phase_width
-    
-    return drawing
 
-def create_sample_collection_diagram(blood_calc, width=400, height=200):
-    """Create blood collection schedule diagram."""
-    drawing = Drawing(width, height)
-    
-    if not blood_calc['needed']:
-        text = String(width/2, height/2, "No blood collection needed", textAnchor='middle')
-        text.fontSize = 10
-        drawing.add(text)
-        return drawing
-    
-    # Title
-    title = String(width/2, height-15, "Blood Collection Schedule", textAnchor='middle')
-    title.fontSize = 11
-    title.fontName = 'Helvetica-Bold'
-    drawing.add(title)
-    
-    # Visual representation of blood volume
-    max_height = 100
-    safe_volume = blood_calc['safe_volume_ul']
-    needed_volume = blood_calc['total_volume_ul']
-    
-    # Safe volume bar
-    safe_bar_height = max_height
-    safe_bar = Rect(100, 30, 60, safe_bar_height)
-    safe_bar.fillColor = HexColor('#d1fae5')
-    safe_bar.strokeColor = HexColor('#26a65b')
-    safe_bar.strokeWidth = 2
-    drawing.add(safe_bar)
-    
-    # Needed volume bar
-    needed_bar_height = min(max_height, (needed_volume / safe_volume) * max_height)
-    color_map = {'green': '#26a65b', 'orange': '#f59e0b', 'red': '#c82529'}
-    needed_color = color_map.get(blood_calc['safety_color'], '#26a65b')
-    
-    needed_bar = Rect(200, 30, 60, needed_bar_height)
-    needed_bar.fillColor = HexColor(needed_color)
-    needed_bar.strokeColor = colors.black
-    needed_bar.strokeWidth = 1
-    drawing.add(needed_bar)
-    
-    # Labels
-    safe_label = String(130, 15, f"Safe: {blood_calc['safe_volume_ml']} mL", textAnchor='middle')
-    safe_label.fontSize = 8
-    drawing.add(safe_label)
-    
-    needed_label = String(230, 15, f"Needed: {blood_calc['total_volume_ml']} mL", textAnchor='middle')
-    needed_label.fontSize = 8
-    drawing.add(needed_label)
-
-    return drawing
 
 
 # ── Study flow chart (shared by the PDF and Word study-plan exports) ─────────
@@ -4872,43 +3988,6 @@ def generate_enhanced_pdf(study_data):
     buffer.seek(0)
     return buffer
 
-def add_visual_timeline_to_docx(doc, phases):
-    """Add visual timeline with colored phases to Word document."""
-    doc.add_heading("Visual Timeline", level=1)
-    
-    # Create timeline table
-    timeline_table = doc.add_table(rows=1, cols=len(phases))
-    timeline_table.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    
-    # Phase colors (RGB)
-    phase_colors = [
-        RGBColor(76, 175, 80),   # Green - Phase 1
-        RGBColor(33, 150, 243),  # Blue - Phase 2
-        RGBColor(255, 152, 0),   # Orange - Phase 3
-        RGBColor(156, 39, 176)   # Purple - Phase 4
-    ]
-    
-    for idx, phase in enumerate(phases):
-        cell = timeline_table.rows[0].cells[idx]
-        cell.text = f"{phase['name']}\n{phase['duration']}"
-        
-        # Style the cell
-        cell_paragraph = cell.paragraphs[0]
-        cell_paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        
-        # Make text bold and white
-        for run in cell_paragraph.runs:
-            run.font.bold = True
-            run.font.color.rgb = RGBColor(255, 255, 255)
-            run.font.size = Pt(11)
-        
-        # Add background color
-        if idx < len(phase_colors):
-            shading_elm = OxmlElement('w:shd')
-            shading_elm.set(qn('w:fill'), '%02x%02x%02x' % phase_colors[idx])
-            cell._element.get_or_add_tcPr().append(shading_elm)
-    
-    doc.add_paragraph()
 
 def merge_timelines(timelines):
     """Merge per-group timelines into ONE unified timeline.
@@ -4968,72 +4047,6 @@ def add_protocol_timelines_to_docx(doc, timelines):
     doc.add_paragraph()
 
 
-def add_study_phases_to_docx(doc, phases):
-    """Add detailed study phases breakdown to Word document - one phase per group."""
-    doc.add_heading("Study Phases", level=1)
-    
-    # Dynamic phase colors (cycle through colors if more groups)
-    base_colors = [
-        RGBColor(76, 175, 80),   # Green
-        RGBColor(33, 150, 243),  # Blue
-        RGBColor(255, 152, 0),   # Orange
-        RGBColor(156, 39, 176),  # Purple
-        RGBColor(233, 30, 99),   # Pink
-        RGBColor(0, 188, 212),   # Cyan
-        RGBColor(255, 87, 34),   # Deep Orange
-        RGBColor(158, 158, 158)  # Grey
-    ]
-    
-    for idx, phase in enumerate(phases):
-        # Get color (cycle if more than 8 groups)
-        color_idx = idx % len(base_colors)
-        phase_color = base_colors[color_idx]
-        
-        # Phase heading with bullet
-        phase_para = doc.add_paragraph()
-        phase_run = phase_para.add_run(f"● {phase['name']}: {phase['title']}")
-        phase_run.font.size = Pt(14)
-        phase_run.font.bold = True
-        phase_run.font.color.rgb = phase_color
-        
-        # Phase details
-        details_para = doc.add_paragraph()
-        details_para.paragraph_format.left_indent = Pt(20)
-        
-        # Build details text
-        details_text = f"""Duration: {phase['duration']}
-Start: {phase['start_date']}
-End: {phase['end_date']}"""
-        
-        # Add group specifics if available
-        if phase.get('dose') or phase.get('route') or phase.get('num_mice'):
-            details_text += "\n\nGroup Details:"
-            if phase.get('dose'):
-                details_text += f"\nDose: {phase['dose']} mg/kg"
-            if phase.get('route'):
-                details_text += f"\nRoute: {phase['route']}"
-            if phase.get('num_mice'):
-                details_text += f"\nSample Size: {phase['num_mice']} mice"
-        
-        # Only add instructions if not empty
-        if phase.get('description', '').strip():
-            details_text += f"\n\nInstructions:\n{phase['description']}"
-        
-        details_para.add_run(details_text)
-        
-        # Add left border color
-        pPr = details_para._element.get_or_add_pPr()
-        pBdr = OxmlElement('w:pBdr')
-        left = OxmlElement('w:left')
-        left.set(qn('w:val'), 'single')
-        left.set(qn('w:sz'), '24')  # Border width
-        left.set(qn('w:space'), '4')
-        color = '%02x%02x%02x' % phase_color
-        left.set(qn('w:color'), color)
-        pBdr.append(left)
-        pPr.append(pBdr)
-        
-        doc.add_paragraph()
 
 def calculate_study_phases(groups, study_start_date=None):
     """Calculate study phases - ONE PHASE PER GROUP directly linked to group data."""
@@ -5554,7 +4567,7 @@ def ratelimit_handler(e):
 
 
 # ============================================================================
-# TOXICITY & EFFECTIVENESS PREDICTION ROUTES
+# TOXICITY PREDICTION ROUTES
 # ============================================================================
 
 @app.route('/predict-toxicity', methods=['POST'])
@@ -5584,267 +4597,62 @@ def predict_toxicity():
         return jsonify({'error': str(e)}), 500
 
 
-@app.route('/predict-effectiveness', methods=['POST'])
-def predict_effectiveness():
-    """Endpoint for effectiveness prediction with mouse-specific parameters."""
-    try:
-        data = request.get_json()
-        
-        drug_name = data.get('drug_name')
-        condition = data.get('condition')
-        target_organ = data.get('target_organ')
-        weight = data.get('weight', 25)
-        age = data.get('age', 8)
-        dose = data.get('dose', 10)
-        route = data.get('route', 'oral')
-        
-        if not drug_name:
-            return jsonify({'error': 'drug_name is required'}), 400
-        
-        result = effectiveness_predictor.predict_effectiveness_comprehensive(
-            drug_name, condition, target_organ, weight, age, dose, route
-        )
-        
-        return jsonify(result)
-        
-    except Exception as e:
-        logger.exception("Error in predict-effectiveness endpoint")
-        return jsonify({'error': str(e)}), 500
 
 
-@app.route('/predict-complete', methods=['POST'])
-def predict_complete():
-    """Endpoint for combined toxicity + effectiveness prediction with mouse parameters."""
-    try:
-        data = request.get_json()
-        
-        drug_name = data.get('drug_name')
-        route = data.get('route', 'oral')
-        target_organ = data.get('target_organ')
-        condition = data.get('condition')
-        weight = data.get('weight', 25)
-        age = data.get('age', 8)
-        dose = data.get('dose', 10)
-        
-        if not drug_name:
-            return jsonify({'error': 'drug_name is required'}), 400
-        
-        # Run both predictions with mouse parameters
-        tox_result = toxicity_predictor.predict_toxicity_comprehensive(
-            drug_name, route, target_organ, weight, age, dose
-        )
-        
-        eff_result = effectiveness_predictor.predict_effectiveness_comprehensive(
-            drug_name, condition, target_organ, weight, age, dose, route
-        )
-        
-        # Generate overall assessment
-        if tox_result['success'] and eff_result['success']:
-            overall = generate_overall_assessment(tox_result, eff_result)
-            feasibility = assess_study_feasibility(tox_result, eff_result)
-            
-            # Add therapeutic window analysis
-            therapeutic_window = calculate_therapeutic_window(tox_result, eff_result, dose)
-            
-            return jsonify({
-                'drug_name': drug_name,
-                'toxicity': tox_result,
-                'effectiveness': eff_result,
-                'overall_assessment': overall,
-                'study_feasibility': feasibility,
-                'therapeutic_window': therapeutic_window,
-                'mouse_parameters': {
-                    'weight_g': weight,
-                    'age_weeks': age,
-                    'dose_mg_kg': dose,
-                    'route': route
-                },
-                'timestamp': datetime.now().isoformat()
-            })
-        else:
-            return jsonify({
-                'error': 'Prediction failed',
-                'toxicity': tox_result,
-                'effectiveness': eff_result
-            }), 500
-        
-    except Exception as e:
-        logger.exception("Error in predict-complete endpoint")
-        return jsonify({'error': str(e)}), 500
 
 
-@app.route('/analyze-drug-comprehensive', methods=['POST'])
-def analyze_drug_comprehensive():
-    """
-    NEW ENDPOINT - Comprehensive drug analysis with:
-    - Toxicity percentage (0-100%) from PubChem
-    - Efficacy percentage (0-100%) from literature
-    - Mouse-specific modifiers (8 parameters)
-    - Risk-benefit assessment
-    - Literature integration
-    """
-    try:
-        data = request.get_json()
-        
-        # Required parameters
-        drug_name = data.get('drug_name')
-        dose = data.get('dose', 10)
-        weight = data.get('weight', 25)
-        age = data.get('age', 8)
-        sex = data.get('sex', 'Mixed')
-        route = data.get('route', 'oral')
-        target_organ = data.get('target_organ', 'General')
-        diet_type = data.get('diet_type', 'Standard')
-        species = data.get('species', 'Mouse')
-
-        if not drug_name:
-            return jsonify({'error': 'drug_name is required'}), 400
-
-        # Step 1: Get PubChem drug data
-        pubchem_data = get_pubchem_drug_data(drug_name)
-
-        # Step 2: Calculate base toxicity from the REAL LD50 (experimental -> ML),
-        # preferring data for the selected species (Mouse/Rat).
-        _cid = pubchem_data.get('cid') if isinstance(pubchem_data, dict) else None
-        ld50_info = get_real_ld50_info(drug_name, cid=_cid, route=route, species=species)
-        if ld50_info.get('found'):
-            base_toxicity_score = ld50_to_toxicity_percentage(ld50_info['ld50_mg_kg'])
-        else:
-            base_toxicity_score = 40.0
-        
-        # Step 3: Apply mouse-specific modifiers to toxicity
-        toxicity_adjusted = apply_mouse_modifiers(
-            base_toxicity_score,
-            dose, weight, age, sex, route, target_organ, diet_type
-        )
-        
-        # Step 4: Get efficiency score from literature
-        efficiency_data = get_drug_efficiency_from_literature(
-            drug_name, target_organ, dose, route
-        )
-        efficiency_score = calculate_efficiency_percentage(efficiency_data)
-        
-        # Step 5: Apply mouse-specific modifiers to efficiency
-        efficiency_adjusted = apply_mouse_modifiers_efficiency(
-            efficiency_score,
-            dose, weight, age, sex, route, target_organ, diet_type
-        )
-        
-        # Step 6: Retrieve literature from NCBI, EuropePMC
-        literature = get_comprehensive_literature(drug_name, target_organ, efficiency_data)
-
-        # Also fetch REAL individual papers (title + link) so the UI can show
-        # clickable references, not just search links.
-        try:
-            _corpus = build_comprehensive_reference_corpus({
-                'drug_name': drug_name,
-                'target_organ': target_organ if target_organ and target_organ != 'General' else '',
-            })
-            reference_papers = _corpus.get('all_papers', [])[:8]
-        except Exception as e:
-            logger.warning(f"Comprehensive reference papers failed for {drug_name}: {e}")
-            reference_papers = []
-        
-        # Step 7: Generate risk-benefit analysis
-        risk_benefit = generate_risk_benefit_analysis(
-            toxicity_adjusted, efficiency_adjusted, drug_name, target_organ
-        )
-
-        # Step 8: Derive IACUC welfare recommendations (humane endpoints + pain
-        # monitoring, Parts 8 & 11). The adjusted toxicity % acts as the risk score.
-        pct_ld50 = 0
-        if ld50_info.get('found') and ld50_info.get('ld50_mg_kg'):
-            try:
-                pct_ld50 = (float(dose) / float(ld50_info['ld50_mg_kg'])) * 100
-            except (TypeError, ValueError, ZeroDivisionError):
-                pct_ld50 = 0
-        welfare = toxicity_predictor.generate_welfare_recommendations(
-            toxicity_adjusted, pct_ld50=pct_ld50, target_organ=target_organ
-        )
-        
-        return jsonify({
-            'drug_name': drug_name,
-            'toxicity_percentage': round(toxicity_adjusted, 1),
-            'efficiency_percentage': round(efficiency_adjusted, 1),
-            'toxicity_score': {
-                'base_score': round(base_toxicity_score, 1),
-                'adjusted_score': round(toxicity_adjusted, 1),
-                'interpretation': interpret_toxicity_score(toxicity_adjusted),
-                'pubchem_data': pubchem_data,
-                'ld50_mg_kg': ld50_info.get('ld50_mg_kg') if ld50_info.get('found') else None,
-                'ld50_category': ld50_info.get('category') if ld50_info.get('found') else None,
-                'ld50_source': ld50_info.get('source') if ld50_info.get('found') else 'none',
-                'ld50_source_detail': ld50_info.get('source_detail', '') if ld50_info.get('found') else ''
-            },
-            'efficiency_score': {
-                'base_score': round(efficiency_score, 1),
-                'adjusted_score': round(efficiency_adjusted, 1),
-                'interpretation': interpret_efficiency_score(efficiency_adjusted),
-                'literature_evidence': efficiency_data.get('evidence_count', 0)
-            },
-            'mouse_parameters': {
-                'compound': drug_name,
-                'dose_mg_kg': dose,
-                'weight_g': weight,
-                'age_weeks': age,
-                'sex': sex,
-                'route': route,
-                'target_organ': target_organ,
-                'diet_type': diet_type
-            },
-            'modifier_summary': generate_modifier_summary(
-                dose, weight, age, sex, route, target_organ, diet_type
-            ),
-            'literature': literature,
-            'reference_papers': reference_papers,
-            'risk_benefit_analysis': risk_benefit,
-            'recommendations': generate_recommendations(toxicity_adjusted, efficiency_adjusted),
-            'welfare_recommendations': welfare,
-            'timestamp': datetime.now().isoformat()
-        })
-        
-    except Exception as e:
-        logger.exception("Error in analyze-drug-comprehensive endpoint")
-        return jsonify({'error': str(e), 'details': str(e)}), 500
 
 
 # ============================================================================
 # NEW HELPER FUNCTIONS FOR COMPREHENSIVE DRUG ANALYSIS
 # ============================================================================
 
-def get_pubchem_drug_data(drug_name):
-    """Fetch drug data from PubChem REST API."""
+
+
+# GHS acute oral toxicity classification (UN GHS Rev.10, Table 3.1.1) —
+# the cut-off values are the published regulatory bands, not a scale of ours.
+# (upper LD50 bound mg/kg, category label, GHS hazard statement, internal risk score)
+_GHS_ORAL_BANDS = [
+    (5,     'Category 1', '≤ 5 mg/kg',        'H300 — Fatal if swallowed',          90),
+    (50,    'Category 2', '> 5–50 mg/kg',     'H300 — Fatal if swallowed',          80),
+    (300,   'Category 3', '> 50–300 mg/kg',   'H301 — Toxic if swallowed',          65),
+    (2000,  'Category 4', '> 300–2000 mg/kg', 'H302 — Harmful if swallowed',        45),
+    (5000,  'Category 5', '> 2000–5000 mg/kg', 'H303 — May be harmful if swallowed', 30),
+]
+
+
+def ld50_to_ghs(ld50_mg_kg):
+    """Classify an oral LD50 into its GHS acute toxicity category.
+
+    Returns the published regulatory band — no invented percentage. `risk_score`
+    is an INTERNAL value used only to scale welfare-monitoring intensity; it is
+    never displayed as a measurement.
+    """
     try:
-        drug_name = (drug_name or '').strip()
-        encoded = requests.utils.quote(drug_name, safe='')
-        url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{encoded}/json"
-        response = requests.get(url, timeout=10)
-        
-        if response.status_code == 200:
-            data = response.json()
-            if 'PC_Compounds' in data and len(data['PC_Compounds']) > 0:
-                compound = data['PC_Compounds'][0]
-                return {
-                    'cid': compound.get('id', {}).get('id', {}).get('cid'),
-                    'source': 'PubChem',
-                    'success': True
-                }
-        return {'success': False}
-    except Exception as e:
-        logger.error(f"Error fetching PubChem data for {drug_name}: {e}")
-        return {'success': False}
+        ld50 = float(ld50_mg_kg)
+    except (TypeError, ValueError):
+        return None
+    for upper, label, band, hazard, risk in _GHS_ORAL_BANDS:
+        if ld50 <= upper:
+            return {'category': label, 'band': band, 'hazard': hazard,
+                    'risk_score': risk, 'scale': 'GHS acute oral toxicity (UN GHS Rev.10)'}
+    return {'category': 'Not classified', 'band': '> 5000 mg/kg',
+            'hazard': 'Below the GHS classification threshold',
+            'risk_score': 20, 'scale': 'GHS acute oral toxicity (UN GHS Rev.10)'}
 
 
-def ld50_to_toxicity_percentage(ld50_mg_kg):
-    """
-    Map an LD50 (mg/kg; lower = more toxic) to a 0-100 toxicity percentage.
-    Calibrated so: LD50~3 -> ~95%, ~50 -> ~74%, ~500 -> ~56%, ~2000 -> ~46%,
-    >5000 -> <40%. Monotonic on a log scale.
-    """
+def round_sig(x, sig=2):
+    """Round to `sig` significant figures — model estimates carry a wide error
+    band, so reporting extra decimals would imply precision that is not there."""
     import math
-    ld50 = max(0.1, float(ld50_mg_kg))
-    pct = 105 - 18 * math.log10(ld50)
-    return max(5.0, min(98.0, pct))
+    try:
+        x = float(x)
+    except (TypeError, ValueError):
+        return None
+    if x == 0:
+        return 0.0
+    r = round(x, -int(math.floor(math.log10(abs(x)))) + (sig - 1))
+    return int(r) if r >= 10 else r
 
 
 def get_real_ld50_info(drug_name, cid=None, route='oral', species='Mouse'):
@@ -5880,353 +4688,28 @@ def get_real_ld50_info(drug_name, cid=None, route='oral', species='Mouse'):
     return {'found': False}
 
 
-def calculate_toxicity_percentage(pubchem_data, drug_name):
-    """
-    Toxicity percentage (0-100%) derived from the REAL LD50 value
-    (experimental data first, trained ML model second). Higher = more toxic.
-    Falls back to a neutral baseline only when no data/model is available.
-    """
-    try:
-        cid = pubchem_data.get('cid') if isinstance(pubchem_data, dict) else None
-        info = get_real_ld50_info(drug_name, cid=cid)
-        if info.get('found'):
-            return ld50_to_toxicity_percentage(info['ld50_mg_kg'])
-        return 40.0  # neutral baseline when nothing is known
-    except Exception as e:
-        logger.error(f"Error calculating toxicity: {e}")
-        return 40.0
 
 
-def apply_mouse_modifiers(base_score, dose, weight, age, sex, route, target_organ, diet_type):
-    """Apply mouse-specific modifiers to toxicity score."""
-    adjusted_score = base_score
-    
-    # Dose modifier
-    dose_factor = min((dose / 50) * 10, 15)
-    adjusted_score += dose_factor
-    
-    # Weight modifier
-    if weight < 20:
-        adjusted_score += 8
-    elif weight > 35:
-        adjusted_score -= 3
-    
-    # Age modifier
-    if age < 4:
-        adjusted_score += 10
-    elif age > 52:
-        adjusted_score += 5
-    
-    # Sex modifier
-    if sex == 'Female':
-        adjusted_score += 3
-    elif sex == 'Male':
-        adjusted_score += 1
-    
-    # Route modifier
-    route_factors = {'Oral': 0, 'IP': 3, 'IV': 8, 'SC': 2, 'IM': 2, 'ICV': 15}
-    adjusted_score += route_factors.get(route, 0)
-    
-    # Organ target modifier
-    organ_factors = {'Brain': 10, 'Liver': 8, 'Kidney': 8, 'Heart': 7, 'Lung': 6, 'General': 0}
-    adjusted_score += organ_factors.get(target_organ, 0)
-    
-    # Diet type modifier
-    diet_factors = {'Standard': 0, 'High fat': 5, 'Fast': 3}
-    adjusted_score += diet_factors.get(diet_type, 0)
-    
-    return min(adjusted_score, 100)
 
 
-def apply_mouse_modifiers_efficiency(base_score, dose, weight, age, sex, route, target_organ, diet_type):
-    """Apply mouse-specific modifiers to efficiency score."""
-    adjusted_score = base_score
-    
-    if 5 < dose < 100:
-        adjusted_score += 10
-    elif dose > 150:
-        adjusted_score -= 15
-    elif dose < 2:
-        adjusted_score -= 10
-    
-    if 20 < weight < 30:
-        adjusted_score += 5
-    elif weight < 15:
-        adjusted_score -= 8
-    
-    if 6 <= age <= 12:
-        adjusted_score += 5
-    elif age < 4:
-        adjusted_score -= 10
-    elif age > 52:
-        adjusted_score -= 5
-    
-    if sex == 'Male':
-        adjusted_score += 2
-    
-    if route == 'Oral':
-        adjusted_score -= 3
-    elif route == 'IV':
-        adjusted_score += 8
-    elif route == 'IP':
-        adjusted_score += 5
-    
-    if diet_type == 'High fat':
-        adjusted_score -= 5
-    
-    return min(adjusted_score, 100)
 
 
-def get_drug_efficiency_from_literature(drug_name, target_organ, dose, route):
-    """Retrieve efficiency data from NCBI and EuropePMC."""
-    try:
-        search_term = f"{drug_name} {target_organ} efficacy mouse"
-        
-        # NCBI Entrez (retmode=json is required for a JSON response)
-        ncbi_url = (f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
-                    f"?db=pubmed&term={requests.utils.quote(search_term)}&retmax=5&retmode=json")
-        pubmed_count = 0
-        try:
-            response = requests.get(ncbi_url, timeout=10)
-            if response.status_code == 200:
-                data = response.json()
-                pubmed_count = int(data.get('esearchresult', {}).get('count', 0))
-        except Exception:
-            pass
-        
-        # EuropePMC
-        epmce_url = f"https://www.ebi.ac.uk/europepmc/webservices/rest/search?query={search_term}&pageSize=5&format=json"
-        epmce_count = 0
-        try:
-            epmce_response = requests.get(epmce_url, timeout=10)
-            if epmce_response.status_code == 200:
-                epmce_data = epmce_response.json()
-                epmce_count = epmce_data.get('hitCount', 0)
-        except:
-            pass
-        
-        evidence_count = pubmed_count + epmce_count
-        
-        if evidence_count > 100:
-            efficiency = 85
-        elif evidence_count > 50:
-            efficiency = 75
-        elif evidence_count > 20:
-            efficiency = 65
-        elif evidence_count > 5:
-            efficiency = 50
-        else:
-            efficiency = 30
-        
-        return {
-            'evidence_count': evidence_count,
-            'pubmed_count': pubmed_count,
-            'epmce_count': epmce_count,
-            'base_efficiency': efficiency,
-            'search_term': search_term
-        }
-    except Exception as e:
-        logger.error(f"Error getting efficiency from literature: {e}")
-        return {'evidence_count': 0, 'base_efficiency': 40}
 
 
-def calculate_efficiency_percentage(efficiency_data):
-    """Calculate efficiency score from literature evidence."""
-    return efficiency_data.get('base_efficiency', 40)
 
 
-def get_comprehensive_literature(drug_name, target_organ, efficiency_data):
-    """Retrieve comprehensive literature from multiple sources."""
-    try:
-        sources = {}
-        
-        search_term = f"{drug_name} {target_organ} mouse"
-        
-        sources['NCBI/PubMed'] = {
-            'link': f"https://pubmed.ncbi.nlm.nih.gov/?term={search_term.replace(' ', '+')}",
-            'count': efficiency_data.get('pubmed_count', 0),
-            'description': f'PubMed search for {drug_name}'
-        }
-        
-        sources['EuropePMC'] = {
-            'link': f"https://europepmc.org/search?query={search_term.replace(' ', '+')}",
-            'count': efficiency_data.get('epmce_count', 0),
-            'description': f'EuropePMC search for {drug_name}'
-        }
-        
-        sources['PubChem'] = {
-            'link': f"https://pubchem.ncbi.nlm.nih.gov/compound/{drug_name}",
-            'description': f'PubChem compound data for {drug_name}'
-        }
-        
-        return sources
-    except Exception as e:
-        logger.error(f"Error retrieving literature: {e}")
-        return {}
 
 
-def generate_risk_benefit_analysis(toxicity_score, efficiency_score, drug_name, target_organ):
-    """Generate risk-benefit analysis."""
-    safety_margin = efficiency_score - toxicity_score
-    
-    if safety_margin > 30:
-        profile = "FAVORABLE - High efficacy with low toxicity risk"
-    elif safety_margin > 10:
-        profile = "ACCEPTABLE - Moderate efficacy with manageable toxicity risk"
-    elif safety_margin > -10:
-        profile = "CAUTIOUS - Similar toxicity and efficacy scores"
-    else:
-        profile = "UNFAVORABLE - High toxicity relative to efficacy"
-    
-    return {
-        'safety_margin': round(safety_margin, 1),
-        'profile': profile,
-        'recommendation': 'Proceed with caution' if safety_margin < 10 else 'Favorable for study'
-    }
 
 
-def generate_modifier_summary(dose, weight, age, sex, route, target_organ, diet_type):
-    """Generate a text summary of modifiers."""
-    return f"Dose: {dose}mg/kg | Weight: {weight}g | Age: {age}wks | Sex: {sex} | Route: {route} | Target: {target_organ} | Diet: {diet_type}"
 
 
-def interpret_toxicity_score(score):
-    """Interpret toxicity score."""
-    if score < 20:
-        return "Low toxicity risk"
-    elif score < 40:
-        return "Mild toxicity risk"
-    elif score < 60:
-        return "Moderate toxicity risk"
-    elif score < 80:
-        return "High toxicity risk"
-    else:
-        return "Very high toxicity risk"
 
 
-def interpret_efficiency_score(score):
-    """Interpret efficiency score."""
-    if score < 20:
-        return "Minimal experimental evidence"
-    elif score < 40:
-        return "Limited efficacy evidence"
-    elif score < 60:
-        return "Moderate efficacy evidence"
-    elif score < 80:
-        return "Good efficacy evidence"
-    else:
-        return "Excellent efficacy evidence"
 
 
-def generate_recommendations(toxicity_score, efficiency_score):
-    """Generate recommendations based on scores."""
-    recommendations = []
-    
-    if toxicity_score > 70:
-        recommendations.append("⚠️ HIGH TOXICITY: Consider lower starting doses")
-        recommendations.append("⚠️ Plan frequent monitoring")
-    elif toxicity_score > 50:
-        recommendations.append("⚠️ MODERATE TOXICITY: Standard precautions recommended")
-    
-    if efficiency_score < 30:
-        recommendations.append("⚠️ LIMITED EVIDENCE: Recommend preliminary dose-response study")
-    
-    if efficiency_score > 75 and toxicity_score < 40:
-        recommendations.append("✓ FAVORABLE: Good candidate for efficacy studies")
-    
-    if efficiency_score < 40 and toxicity_score > 60:
-        recommendations.append("✗ UNFAVORABLE: Consider alternative compounds")
-    
-    if not recommendations:
-        recommendations.append("✓ Proceed with standard protocols")
-    
-    return recommendations
 
 
-@app.route('/test-assessment', methods=['GET'])
-def test_assessment():
-    """
-    Self-test endpoint for drug assessment functionality.
-    Tests all prediction endpoints and returns results.
-    """
-    results = {
-        'test_suite': 'Drug Assessment API Tests',
-        'timestamp': datetime.now().isoformat(),
-        'tests': [],
-        'summary': {}
-    }
-    
-    test_cases = [
-        {
-            'name': 'Toxicity Prediction - Aspirin',
-            'endpoint': '/predict-toxicity',
-            'payload': {'drug_name': 'Aspirin', 'route': 'oral'}
-        },
-        {
-            'name': 'Effectiveness Prediction - Ibuprofen',
-            'endpoint': '/predict-effectiveness',
-            'payload': {'drug_name': 'Ibuprofen', 'condition': 'inflammation'}
-        },
-        {
-            'name': 'Complete Assessment - Metformin',
-            'endpoint': '/predict-complete',
-            'payload': {'drug_name': 'Metformin', 'route': 'oral', 'condition': 'diabetes'}
-        },
-        {
-            'name': 'High Toxicity Drug - Doxorubicin',
-            'endpoint': '/predict-complete',
-            'payload': {'drug_name': 'Doxorubicin', 'route': 'IV', 'condition': 'cancer'}
-        },
-        {
-            'name': 'Comprehensive Analysis - Aspirin',
-            'endpoint': '/analyze-drug-comprehensive',
-            'payload': {'drug_name': 'Aspirin', 'dose': 100, 'weight': 25, 'age': 10, 'sex': 'Female', 'route': 'Oral', 'target_organ': 'General', 'diet_type': 'Standard'}
-        }
-    ]
-    
-    passed = 0
-    failed = 0
-    
-    for test_case in test_cases:
-        test_result = {
-            'name': test_case['name'],
-            'endpoint': test_case['endpoint'],
-            'status': 'unknown',
-            'error': None
-        }
-        
-        try:
-            with app.test_client() as client:
-                response = client.post(
-                    test_case['endpoint'],
-                    json=test_case['payload'],
-                    content_type='application/json'
-                )
-                
-                if response.status_code == 200:
-                    test_result['status'] = 'passed'
-                    test_result['response_preview'] = str(response.json)[:200] + '...'
-                    passed += 1
-                else:
-                    test_result['status'] = 'failed'
-                    test_result['error'] = f"Status code: {response.status_code}"
-                    failed += 1
-                    
-        except Exception as e:
-            test_result['status'] = 'error'
-            test_result['error'] = str(e)
-            failed += 1
-        
-        results['tests'].append(test_result)
-    
-    results['summary'] = {
-        'total': len(test_cases),
-        'passed': passed,
-        'failed': failed,
-        'success_rate': f"{(passed/len(test_cases)*100):.1f}%"
-    }
-    
-    return jsonify(results)
 
 
 @app.route('/health', methods=['GET'])
