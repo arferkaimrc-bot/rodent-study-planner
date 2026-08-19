@@ -21,6 +21,7 @@ from io import BytesIO
 import logging
 from datetime import datetime, timedelta
 import os
+import math
 import re
 import hashlib
 import pickle
@@ -1230,164 +1231,9 @@ openalex_rate_limiter = RateLimiter(calls_per_second=2)
 # MACHINE LEARNING MODEL
 # ============================================================================
 
-class SampleSizeMLModel:
-    """Machine learning model for sample size prediction."""
-    
-    def __init__(self, model_path=Config.ML_MODEL_PATH):
-        self.model_path = model_path
-        self.model = None
-        self.scaler = None
-        self.feature_names = [
-            'dose', 'weight', 'age', 'num_groups',
-            'variability_low', 'variability_medium', 'variability_high',
-            'route_oral', 'route_ip', 'route_iv', 'route_sc',
-            'target_brain', 'target_liver', 'target_heart', 'target_kidney',
-            'strain_c57', 'strain_balb', 'sex_male', 'sex_female'
-        ]
-        self.load_or_create_model()
-    
-    def load_or_create_model(self):
-        """Load existing model or create new one."""
-        model_file = os.path.join(self.model_path, 'sample_size_model.pkl')
-        scaler_file = os.path.join(self.model_path, 'scaler.pkl')
-        
-        if os.path.exists(model_file) and os.path.exists(scaler_file):
-            try:
-                self.model = joblib.load(model_file)
-                self.scaler = joblib.load(scaler_file)
-                logger.info("ML model loaded successfully")
-                return
-            except Exception as e:
-                logger.warning(f"Failed to load model: {e}")
-        
-        # Create and train new model with synthetic data
-        self.train_initial_model()
-    
-    def train_initial_model(self):
-        """Train initial model with synthetic data."""
-        logger.info("Training initial ML model with synthetic data...")
-        
-        # Generate synthetic training data based on experimental design principles
-        np.random.seed(42)
-        n_samples = 500
-        
-        # Features
-        X = {
-            'dose': np.random.uniform(0, 100, n_samples),
-            'weight': np.random.uniform(18, 35, n_samples),
-            'age': np.random.uniform(6, 20, n_samples),
-            'num_groups': np.random.randint(2, 6, n_samples),
-            'variability_low': np.random.binomial(1, 0.3, n_samples),
-            'variability_medium': np.random.binomial(1, 0.5, n_samples),
-            'variability_high': np.random.binomial(1, 0.2, n_samples),
-            'route_oral': np.random.binomial(1, 0.4, n_samples),
-            'route_ip': np.random.binomial(1, 0.3, n_samples),
-            'route_iv': np.random.binomial(1, 0.15, n_samples),
-            'route_sc': np.random.binomial(1, 0.15, n_samples),
-            'target_brain': np.random.binomial(1, 0.3, n_samples),
-            'target_liver': np.random.binomial(1, 0.2, n_samples),
-            'target_heart': np.random.binomial(1, 0.2, n_samples),
-            'target_kidney': np.random.binomial(1, 0.15, n_samples),
-            'strain_c57': np.random.binomial(1, 0.7, n_samples),
-            'strain_balb': np.random.binomial(1, 0.2, n_samples),
-            'sex_male': np.random.binomial(1, 0.6, n_samples),
-            'sex_female': np.random.binomial(1, 0.3, n_samples)
-        }
-        
-        X_df = pd.DataFrame(X)
-        
-        # Target: sample size based on realistic rules
-        base_n = 8
-        y = np.full(n_samples, base_n)
-        
-        # Adjust based on features
-        y += X_df['variability_high'] * 4
-        y += X_df['variability_medium'] * 2
-        y += X_df['target_brain'] * 2
-        y += X_df['route_iv'] * 1
-        y += X_df['num_groups'] * 0.5
-        y += (X_df['age'] < 8) * 1
-        y += (X_df['age'] > 16) * 1
-        y += np.random.normal(0, 1, n_samples)  # Add noise
-        y = np.clip(y, 6, 18).astype(int)
-        
-        # Train model
-        self.scaler = StandardScaler()
-        X_scaled = self.scaler.fit_transform(X_df)
-        
-        self.model = GradientBoostingRegressor(
-            n_estimators=100,
-            learning_rate=0.1,
-            max_depth=4,
-            random_state=42
-        )
-        
-        self.model.fit(X_scaled, y)
-        
-        # Save model
-        joblib.dump(self.model, os.path.join(self.model_path, 'sample_size_model.pkl'))
-        joblib.dump(self.scaler, os.path.join(self.model_path, 'scaler.pkl'))
-        
-        logger.info("ML model trained and saved")
-    
-    def extract_features(self, group_data):
-        """Extract features from group data."""
-        features = {}
-        
-        # Numeric features
-        features['dose'] = float(group_data.get('dose', 0))
-        features['weight'] = float(group_data.get('weight', 25))
-        features['age'] = float(group_data.get('age', 8))
-        features['num_groups'] = 2  # Will be updated based on total groups
-        
-        # Variability (default to medium if not specified)
-        var = group_data.get('variability', 'medium').lower()
-        features['variability_low'] = 1 if var == 'low' else 0
-        features['variability_medium'] = 1 if var == 'medium' else 0
-        features['variability_high'] = 1 if var in ['high', 'medium-high'] else 0
-        
-        # Route
-        route = (group_data.get('route', 'oral') or 'oral').lower()
-        features['route_oral'] = 1 if 'oral' in route else 0
-        features['route_ip'] = 1 if 'ip' in route else 0
-        features['route_iv'] = 1 if 'iv' in route else 0
-        features['route_sc'] = 1 if 'sc' in route else 0
-        
-        # Target organ
-        target = (group_data.get('target_organ', '') or '').lower()
-        features['target_brain'] = 1 if 'brain' in target or 'neuro' in target else 0
-        features['target_liver'] = 1 if 'liver' in target or 'hepatic' in target else 0
-        features['target_heart'] = 1 if 'heart' in target or 'cardio' in target else 0
-        features['target_kidney'] = 1 if 'kidney' in target or 'renal' in target else 0
-        
-        # Strain
-        strain = (group_data.get('strain', '') or '').lower()
-        features['strain_c57'] = 1 if 'c57' in strain else 0
-        features['strain_balb'] = 1 if 'balb' in strain else 0
-        
-        # Sex
-        sex = (group_data.get('sex', '') or '').lower()
-        features['sex_male'] = 1 if 'male' in sex and 'female' not in sex else 0
-        features['sex_female'] = 1 if 'female' in sex and 'male' not in sex else 0
-        
-        return pd.DataFrame([features])[self.feature_names]
-    
-    def predict_sample_size(self, group_data):
-        """Predict optimal sample size."""
-        if self.model is None:
-            return None
-        
-        try:
-            features = self.extract_features(group_data)
-            features_scaled = self.scaler.transform(features)
-            prediction = self.model.predict(features_scaled)[0]
-            return max(6, min(18, int(round(prediction))))
-        except Exception as e:
-            logger.error(f"ML prediction failed: {e}")
-            return None
 
 # Initialize ML model
-ml_model = SampleSizeMLModel() if ML_AVAILABLE else None
+ml_model = None  # retired: sample size now comes from power analysis only
 
 # ============================================================================
 # ENHANCED API FUNCTIONS - MULTIPLE SOURCES
@@ -2622,12 +2468,12 @@ def get_prediction_and_suggestion(group, all_groups_count=1):
         }
 
     if is_control:
-        # The control gets a REAL recommended number too (balanced design): the
-        # power-analysis N clamped to the rodent-typical range. If a treatment
-        # group is present, the UI matches the control's number to it.
+        # The control gets the same power-analysis N (balanced design). The
+        # number is NOT clamped: capping it would quietly report a group size
+        # that does not deliver the stated 80% power.
         _pa = calculate_sample_size_power_analysis(effect_size=0.8, power=0.80, alpha=0.05)
-        _ctrl_n = max(6, min(18, _pa.get('n_per_group', 8))) if _pa.get('success') else 8
-        _ctrl_range = f"{_ctrl_n}-{int(_ctrl_n * 1.1)}"
+        _ctrl_n = _pa.get('n_per_group', 8) if _pa.get('success') else 8
+        _ctrl_range = f"{_ctrl_n}-{math.ceil(_ctrl_n * 1.1)}"
         # Add blood warnings for control group too
         warnings = []
         if blood_calc['needed'] and blood_calc['safety_color'] != 'green':
@@ -2661,150 +2507,30 @@ def get_prediction_and_suggestion(group, all_groups_count=1):
             }
         }
 
-    # Use ML model for prediction if available
+    # Sample size comes from a formal two-sample power analysis and nothing
+    # else. Every assumption is stated back to the researcher so an IACUC
+    # reviewer can reproduce the number independently.
     ml_prediction = None
-    if ml_model:
-        group['num_groups'] = all_groups_count
-        ml_prediction = ml_model.predict_sample_size(group)
-        logger.info("ML prediction for %s: %s",
-                    ("[confidential compound]" if is_confidential(group) else drug), ml_prediction)
     
-    # ENHANCED: Dynamic sample size calculation based on multiple factors
-    base_n = 8  # Base sample size
-    
-    # Factor 1: Drug type and route adjustments
-    route = (group.get('route', '') or '').lower()
-    route_multipliers = {
-        'iv': 1.2,      # Higher variability in IV dosing
-        'ip': 1.1,      # Moderate increase for IP
-        'oral': 1.0,    # Standard for oral
-        'sc': 1.05,     # Slight increase for SC
-        'im': 1.1,      # Moderate for IM
-        'icv': 1.3      # Highest variability for ICV
-    }
-    route_factor = route_multipliers.get(route, 1.0)
-    
-    # Factor 2: Age-based adjustments
-    age = parse_float_safe(group.get('age'), 8)
-    if age < 6:  # Young mice - more variability
-        age_factor = 1.25
-    elif age > 18:  # Old mice - more variability and mortality
-        age_factor = 1.3
-    else:  # Adult mice - standard
-        age_factor = 1.0
-    
-    # Factor 3: Target organ complexity
-    target_organ = (group.get('target_organ', '') or '').lower()
-    organ_complexity = {
-        'brain': 1.3,      # High variability in neuro studies
-        'cns': 1.3,
-        'nervous': 1.3,
-        'heart': 1.25,     # Cardiac studies need more power
-        'cardiovascular': 1.25,
-        'liver': 1.15,     # Moderate complexity
-        'kidney': 1.2,     # Renal studies variable
-        'renal': 1.2,
-        'lung': 1.2,       # Respiratory variability
-        'metabolic': 1.15,
-        'tumor': 1.35,     # Tumor studies highly variable
-        'cancer': 1.35
-    }
-    organ_factor = 1.0
-    for key, factor in organ_complexity.items():
-        if key in target_organ:
-            organ_factor = max(organ_factor, factor)
-            break
-    
-    # Factor 4: Dose-dependent adjustments
-    dose = parse_float_safe(group.get('dose'), 0)
-    if dose > 0:
-        if dose < 1:  # Very low dose - may need more animals to detect effect
-            dose_factor = 1.2
-        elif dose > 100:  # High dose - more toxicity risk
-            dose_factor = 1.15
-        else:
-            dose_factor = 1.0
-    else:
-        dose_factor = 1.0
-    
-    # Factor 5: Sex-based considerations
-    sex = (group.get('sex', '') or '').lower()
-    if 'mixed' in sex or 'both' in sex:
-        sex_factor = 1.4  # Mixed groups need more animals
-    else:
-        sex_factor = 1.0
-    
-    # Factor 6: Strain-specific variability
-    strain = (group.get('strain', '') or '').lower()
-    strain_variability = {
-        'c57bl/6': 1.0,    # Standard strain, well-characterized
-        'c57': 1.0,
-        'balb/c': 1.1,     # Slightly more variable
-        'balb': 1.1,
-        'nude': 1.2,       # Immunocompromised, more variable
-        'scid': 1.25,      # Higher variability
-        'nsg': 1.25,
-        'outbred': 1.3     # Outbred strains most variable
-    }
-    strain_factor = 1.0
-    for key, factor in strain_variability.items():
-        if key in strain:
-            strain_factor = factor
-            break
-    
-    # Factor 7: Number of groups (for multiple comparisons)
-    if all_groups_count > 4:
-        groups_factor = 1.15  # More groups = need more power
-    elif all_groups_count > 6:
-        groups_factor = 1.25
-    else:
-        groups_factor = 1.0
-    
-    # Factor 8: Sample type complexity (if blood collection is risky)
-    sample_types = group.get('sample_types', [])
-    blood_samples = [s for s in sample_types if 'blood' in s.lower() or 'plasma' in s.lower() or 'serum' in s.lower()]
-    if len(blood_samples) > 3:  # Multiple blood assays = plan for attrition
-        sample_factor = 1.2
-    elif blood_samples:
-        sample_factor = 1.1
-    else:
-        sample_factor = 1.0
-    
-    # Combine all factors
-    total_factor = (route_factor * age_factor * organ_factor * dose_factor *
-                   sex_factor * strain_factor * groups_factor * sample_factor)
-    
-    # Calculate dynamic sample size
-    dynamic_n = int(np.ceil(base_n * total_factor))
-    
-    # Ensure reasonable bounds (6-20 mice per group)
-    dynamic_n = max(6, min(20, dynamic_n))
-    
-    # Power analysis with adjusted effect size
-    effect_size = 0.8  # Medium effect size default
-    
-    # Adjust effect size based on target organ (some effects harder to detect)
-    if organ_factor > 1.2:
-        effect_size = 0.7  # Smaller effect in complex systems
-    
+    # Cohen's conventional large effect; stated explicitly rather than
+    # silently varied, because changing it changes the required N.
+    effect_size = 0.8
     power_result = calculate_sample_size_power_analysis(
         effect_size=effect_size,
         power=0.80,
         alpha=0.05
     )
-    
-    suggested_n_power = power_result['n_per_group']
-    
-    # Combine dynamic calculation with power analysis and ML if available
-    if ml_prediction:
-        # Average of all three methods
-        suggested_n = int((dynamic_n + suggested_n_power + ml_prediction) / 3)
-    else:
-        # Average of dynamic and power analysis
-        suggested_n = int((dynamic_n + suggested_n_power) / 2)
-    
-    # Final bounds check
-    suggested_n = max(6, min(18, suggested_n))
+    suggested_n = power_result['n_per_group']
+    sample_size_basis = {
+        'method': 'Two-sample t-test power analysis (statsmodels tt_ind_solve_power)',
+        'effect_size_d': effect_size,
+        'power': 0.80,
+        'alpha': 0.05,
+        'n_per_group': suggested_n,
+        'attrition_allowance': '10%',
+        'note': ('Assumes a two-group comparison. Change the effect size and '
+                 'the required N changes — state the assumption in the protocol.'),
+    }
     
     # Generate power curve data
     sample_sizes, powers = generate_power_curve_data(effect_size)
@@ -2814,48 +2540,15 @@ def get_prediction_and_suggestion(group, all_groups_count=1):
         'effect_size': effect_size
     }
     
-    n_with_attrition = int(suggested_n * 1.1)
+    n_with_attrition = math.ceil(suggested_n * 1.1)
     
-    # Build comprehensive rationale with factor breakdown
+    # Rationale states the method and its assumptions, nothing more.
     rationale_parts = []
-    rationale_parts.append(f"Recommended sample size: {suggested_n}-{n_with_attrition} {animal_word} per group.")
-    rationale_parts.append(f"Based on multi-factor analysis combining power analysis (80% power, α=0.05, effect size={effect_size})")
-    
-    # Add factor explanations if they significantly affected the calculation
-    factor_explanations = []
-    if route_factor > 1.05:
-        factor_explanations.append(f"{route.upper()} route (×{route_factor:.2f})")
-    if age_factor > 1.05:
-        if age < 6:
-            factor_explanations.append(f"young mice age {age}w (×{age_factor:.2f})")
-        else:
-            factor_explanations.append(f"aged mice {age}w (×{age_factor:.2f})")
-    if organ_factor > 1.05:
-        factor_explanations.append(f"{target_organ} study (×{organ_factor:.2f})")
-    if sex_factor > 1.05:
-        factor_explanations.append(f"mixed sex groups (×{sex_factor:.2f})")
-    if strain_factor > 1.05:
-        factor_explanations.append(f"{strain} strain variability (×{strain_factor:.2f})")
-    if groups_factor > 1.05:
-        factor_explanations.append(f"{all_groups_count} groups multiple comparisons (×{groups_factor:.2f})")
-    if sample_factor > 1.05:
-        factor_explanations.append(f"complex sampling ({len(blood_samples)} blood types) (×{sample_factor:.2f})")
-    if dose_factor > 1.05:
-        if dose < 1:
-            factor_explanations.append(f"low dose {dose} mg/kg (×{dose_factor:.2f})")
-        else:
-            factor_explanations.append(f"high dose {dose} mg/kg (×{dose_factor:.2f})")
-    
-    if factor_explanations:
-        rationale_parts.append(f" with adjustments for: {', '.join(factor_explanations)}.")
-    else:
-        rationale_parts.append(".")
-    
-    if ml_prediction:
-        rationale_parts.append(f"ML model prediction: {ml_prediction} {animal_word}.")
-        rationale_parts.append(f"Dynamic calculation: {dynamic_n} {animal_word}.")
-        rationale_parts.append(f"Final recommendation averages all methods.")
-    
+    rationale_parts.append(
+        f"Recommended sample size: {suggested_n}-{n_with_attrition} {animal_word} per group.")
+    rationale_parts.append(
+        f"Two-sample t-test power analysis: {int(0.80 * 100)}% power, alpha 0.05, "
+        f"Cohen's d {effect_size}, plus a 10% attrition allowance.")
     if has_refs:
         rationale_parts.append(f"Found {len(ref_corpus['all_papers'])} relevant papers across multiple databases.")
     
@@ -2922,23 +2615,7 @@ def get_prediction_and_suggestion(group, all_groups_count=1):
         "statistical_test": recommend_statistical_test(all_groups_count),
         "blood_calculation": blood_calc,
         "ml_prediction": ml_prediction,
-        "calculation_factors": {
-            "base_n": base_n,
-            "dynamic_n": dynamic_n,
-            "power_analysis_n": suggested_n_power,
-            "final_n": suggested_n,
-            "factors": {
-                "route": {"value": route, "multiplier": route_factor},
-                "age": {"value": age, "multiplier": age_factor},
-                "organ": {"value": target_organ, "multiplier": organ_factor},
-                "dose": {"value": dose, "multiplier": dose_factor},
-                "sex": {"value": sex, "multiplier": sex_factor},
-                "strain": {"value": strain, "multiplier": strain_factor},
-                "groups": {"value": all_groups_count, "multiplier": groups_factor},
-                "samples": {"value": len(blood_samples), "multiplier": sample_factor}
-            },
-            "total_multiplier": total_factor
-        },
+        "sample_size_basis": sample_size_basis,
         "all_sources": {
             "pubmed_count": len(ref_corpus.get("pubmed", [])),
             "europe_pmc_count": len(ref_corpus.get("europe_pmc", [])),
