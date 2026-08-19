@@ -2265,6 +2265,27 @@
                                             : `<span title="R² ${a.r2} (${a.reliability})${a.test_mae != null ? ' · MAE ' + a.test_mae : ''} · ${a.key}" style="padding:4px 9px;border-radius:8px;font-size:.8rem;font-weight:600;background:#f8fafc;color:#334155;border:1px solid var(--border);">${a.label}: ${a.value}${a.unit ? ' ' + a.unit : ''}${a.reliability === 'weak' ? ' ⚠︎' : ''}</span>`).join('')}
                                     </div>
                                 </div>` : ''}
+                                ${s.mortality_evidence ? `
+                                <div class="summary-tile wide">
+                                    <div class="stile-label">⚰️ Reported animal loss in comparable studies <span style="font-weight:400;">(open-access literature)</span></div>
+                                    ${s.mortality_evidence.found ? `
+                                    <div class="stile-value" style="font-size:1rem;">
+                                        <span style="color:#166534;font-weight:700;">${s.mortality_evidence.reported_no_mortality}</span> report no mortality
+                                        &nbsp;·&nbsp;
+                                        <span style="color:${s.mortality_evidence.reported_mortality > 0 ? '#b91c1c' : '#64748b'};font-weight:700;">${s.mortality_evidence.reported_mortality}</span> report animal deaths
+                                    </div>
+                                    <div class="stile-sub">
+                                        ${[].concat(
+                                            (s.mortality_evidence.citations_mortality || []).map(c => `<a href="${c.url}" target="_blank" style="color:#b91c1c;">deaths: ${c.title.slice(0, 58)}${c.title.length > 58 ? '…' : ''} (${c.year})</a>`),
+                                            (s.mortality_evidence.citations_no_mortality || []).map(c => `<a href="${c.url}" target="_blank" style="color:#166534;">no deaths: ${c.title.slice(0, 58)}${c.title.length > 58 ? '…' : ''} (${c.year})</a>`)
+                                        ).slice(0, 4).join('<br>')}
+                                    </div>
+                                    <div class="stile-sub" style="color:#8a5a12;margin-top:5px;">${s.mortality_evidence.caveat}</div>`
+                                    : `
+                                    <div class="stile-value" style="color:#64748b;font-size:1rem;">No published evidence</div>
+                                    <div class="stile-sub">${s.mortality_evidence.reason || 'Nothing found.'} The attrition allowance below is the standard default, with no compound-specific basis.</div>`}
+                                    ${s.attrition_basis ? `<div class="stile-sub" style="margin-top:5px;">${s.attrition_basis}</div>` : ''}
+                                </div>` : ''}
                                 ${s.clinical_trials && s.clinical_trials.total ? `
                                 <div class="summary-tile wide">
                                     <div class="stile-label">🧪 Clinical trials <span style="font-weight:400;">(ClinicalTrials.gov)</span></div>

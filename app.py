@@ -1666,6 +1666,110 @@ def search_europe_pmc(group, max_results=12):
         return out
 
 
+# Phrases that state animal loss, and phrases that state its absence. Polarity
+# lives in the phrase itself, so the two searches stay separable without having
+# to parse negation out of free text.
+_MORTALITY_POS = ['"animals died"', '"mice died"', '"rats died"',
+                  '"treatment-related mortality"', '"treatment related mortality"',
+                  '"died during the study"']
+_MORTALITY_NEG = ['"no mortality"', '"no animals died"', '"no mice died"',
+                  '"no rats died"', '"no treatment-related mortality"',
+                  '"all animals survived"']
+# A positive hit must not actually be one of the negated forms. Europe PMC has
+# no sentence-level context, so the negated phrasings are excluded by query.
+_MORTALITY_NOT = ['"no animals died"', '"none of the animals died"',
+                  '"no mice died"', '"no rats died"', '"no animals had died"']
+
+
+def _epmc_count_and_cite(query, max_cites=3):
+    """Hit count plus a few citable records for one Europe PMC query.
+
+    Relevance order, not citation count: sorting by citations surfaces broad
+    review articles that merely mention the terms, which are useless to a
+    researcher trying to read what a comparable study actually observed.
+    """
+    params = {"query": query, "format": "json", "pageSize": max_cites}
+    r = requests.get(f"{Config.EUROPE_PMC_BASE}/search", params=params,
+                     timeout=Config.REQUEST_TIMEOUT)
+    r.raise_for_status()
+    data = r.json()
+    cites = []
+    for rec in (data.get("resultList", {}).get("result", []) or []):
+        title = (rec.get("title") or "").strip()
+        if not title:
+            continue
+        cites.append({
+            "title": title,
+            "year": rec.get("pubYear", ""),
+            "journal": rec.get("journalTitle", ""),
+            "url": f"https://europepmc.org/article/{rec.get('source', 'MED')}/{rec.get('id', '')}",
+        })
+    return int(data.get("hitCount", 0)), cites
+
+
+def search_mortality_evidence(group):
+    """What the published literature actually reports about animal loss.
+
+    This is deliberately NOT an attrition prediction. Measured across Europe
+    PMC, fewer than 0.5% of open-access rodent toxicity papers state animal
+    deaths at all, the phrasing is inconsistent, and the papers that do report
+    deaths are mostly acute LD50 studies designed to be lethal — so any rate
+    learned from that corpus would describe the wrong population. What the
+    corpus CAN support is a citable statement of what comparable studies
+    reported, which the researcher then reads and judges.
+
+    Returns a dict with counts, citations, and an explicit `found` flag, or a
+    `found: False` result the interface is expected to state plainly.
+    """
+    term = external_term(group)          # compound class when confidential
+    if not term:
+        return {"found": False, "reason": "No compound term to search."}
+
+    species = (group.get("species") or "").lower()
+    animal = "rat OR rats" if "rat" in species else "mouse OR mice"
+    # The compound must be what the paper is ABOUT (title/abstract), and reviews
+    # are excluded — otherwise the hits are broad articles that merely mention
+    # the drug somewhere in the body, which tell the researcher nothing.
+    scope = (f'(TITLE:"{term}" OR ABSTRACT:"{term}") AND ({animal}) '
+             f'AND (OPEN_ACCESS:Y) AND (HAS_FT:Y) NOT (PUB_TYPE:"Review")')
+
+    cache_key = {"term": term.lower(), "animal": animal}
+    cached = api_cache.get("mortality_evidence", cache_key)
+    if cached:
+        return cached
+
+    def section_any(phrases):
+        return " OR ".join(f"{sec}:{p}" for p in phrases for sec in ("RESULTS", "METHODS"))
+
+    pos_q = (f'{scope} AND ({section_any(_MORTALITY_POS)})'
+             + "".join(f' NOT (RESULTS:{p} OR METHODS:{p})' for p in _MORTALITY_NOT))
+    neg_q = f'{scope} AND ({section_any(_MORTALITY_NEG)})'
+
+    try:
+        n_pos, cites_pos = _epmc_count_and_cite(pos_q)
+        n_neg, cites_neg = _epmc_count_and_cite(neg_q)
+    except Exception as e:
+        logger.warning(f"Mortality-evidence search failed for {term}: {e}")
+        return {"found": False, "reason": "Literature search unavailable."}
+
+    result = {
+        "found": bool(n_pos or n_neg),
+        "term": term,
+        "reported_mortality": n_pos,
+        "reported_no_mortality": n_neg,
+        "citations_mortality": cites_pos,
+        "citations_no_mortality": cites_neg,
+        "caveat": ("Counts of what open-access papers state, not an attrition rate. "
+                   "Reporting is sparse and inconsistent, and studies reporting deaths "
+                   "are often acute lethality designs — read the cited papers before "
+                   "relying on them."),
+    }
+    if not result["found"]:
+        result["reason"] = "No open-access study of this compound states either outcome."
+    api_cache.set("mortality_evidence", cache_key, result)
+    return result
+
+
 def search_doaj(group, max_results=6):
     """Search DOAJ (Directory of Open Access Journals) — fully open-access,
     peer-reviewed journal articles."""
@@ -2362,6 +2466,11 @@ def get_prediction_and_suggestion(group, all_groups_count=1):
         # function swallows any error/timeout, so results never hang). Controls skipped.
         clinical_trials = None if (is_control or _private) else search_clinical_trials(drug)
 
+        # What comparable published studies reported about animal loss. Safe in
+        # confidential mode: the search runs on the compound CLASS, never the
+        # name (search_mortality_evidence uses external_term).
+        mortality_evidence = None if is_control else search_mortality_evidence(group)
+
         # Recommended strain by experimental paradigm (common choices in the
         # literature) — a suggestion the researcher can override.
         _paradigm = (group.get('experiment_type') or '').lower()
@@ -2460,6 +2569,10 @@ def get_prediction_and_suggestion(group, all_groups_count=1):
             'ml_flags': ml_flags,           # ML safety/ADME classifier flags (hERG, DILI, Ames, BBB)
             'ml_adme': ml_adme,             # ML ADME regression values (LogD, Caco-2, PPBR)
             'clinical_trials': clinical_trials,  # ClinicalTrials.gov context (free)
+            'mortality_evidence': mortality_evidence,  # cited, never a predicted rate
+            'attrition_basis': ('Standard 10% allowance for technical loss. Not adjusted for '
+                                'predicted toxicity — a dose expected to kill animals should be '
+                                'lowered, not padded with extra animals.'),
             'is_control': is_control,       # lets the UI match control N to treatment N
             'confidential': _private,       # compound name kept inside the platform
             'timeline': build_protocol_timeline(group, animal_word),
