@@ -1013,6 +1013,15 @@
             </div>
 
             <div class="form-group">
+                <label>What is the study comparing? <span style="font-weight:400;font-size:.8rem;color:var(--muted);">— decides which power calculation applies</span></label>
+                <div class="ichip-row" data-field="comparison_design" style="margin-top:4px;">
+                    <button type="button" class="ichip sel" data-value="vs_control">Each treated group vs control</button>
+                    <button type="button" class="ichip" data-value="overall">Overall difference among groups</button>
+                </div>
+                <div class="sec-note" style="margin-top:5px;">Comparing each dose against a shared control uses Dunnett's exact critical value, which needs fewer animals than a Bonferroni split. An overall test answers only whether the groups differ at all.</div>
+            </div>
+
+            <div class="form-group">
                 <label>Primary outcome measure <span style="font-weight:400;font-size:.8rem;color:var(--muted);">— one per study; this is what the group size is calculated from</span></label>
                 <input id="study-primary-endpoint" type="text" list="ovm-measures"
                        placeholder="e.g., body weight, blood glucose level, serum alanine aminotransferase activity">
@@ -1979,6 +1988,7 @@
                     compound_class: (groupEl.querySelector('.compound-class')?.value || '').trim(),
                     // Study-level: the same endpoint is stamped onto every group so
                     // the design stays balanced instead of drifting group by group.
+                    comparison_design: (document.querySelector('[data-field="comparison_design"] .ichip.sel')?.dataset.value || 'vs_control'),
                     primary_endpoint: (document.getElementById('study-primary-endpoint')?.value || '').trim(),
                     detectable_difference_pct: (document.getElementById('study-detectable-difference')?.value || '').trim(),
                     dose: groupEl.querySelector('.dose').value,

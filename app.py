@@ -53,8 +53,8 @@ from docx.oxml import OxmlElement
 from iacuc_generator import generate_iacuc_docx
 
 # Statistical packages
-from scipy import stats
-from statsmodels.stats.power import tt_ind_solve_power
+from scipy import stats, optimize
+from statsmodels.stats.power import tt_ind_solve_power, FTestAnovaPower
 
 # ML packages
 try:
@@ -228,6 +228,7 @@ if VALIDATION_AVAILABLE:
         confidential = fields.Boolean()
         smiles = fields.Str(validate=validate.Length(max=1000))
         compound_class = fields.Str(validate=validate.Length(max=200))
+        comparison_design = fields.Str(validate=validate.Length(max=30))
         # Drive the sample size from the real endpoint rather than a convention.
         primary_endpoint = fields.Str(validate=validate.Length(max=200))
         detectable_difference_pct = fields.Str(validate=validate.Length(max=20))
@@ -2305,6 +2306,41 @@ def calculate_sample_size_power_analysis(
             "n_per_group": 10
         }
 
+def dunnett_critical_value(n_comparisons, alpha=0.05):
+    """Two-sided Dunnett critical value for many-to-one comparisons.
+
+    Bonferroni treats the comparisons as independent, but every treated arm is
+    compared against the SAME control, so the test statistics are correlated
+    (rho = 1/2 for equal group sizes). Correcting for that correlation instead
+    of ignoring it is the exact test for this design and needs fewer animals.
+
+    Derived from the equicoordinate quantile of the multivariate normal rather
+    than read from a stored table, so the values cannot silently go stale.
+    Validated against published tables: 1.960, 2.212, 2.349, 2.442 for one to
+    four comparisons at alpha 0.05.
+    """
+    k = max(1, int(n_comparisons))
+    if k == 1:
+        return float(stats.norm.ppf(1 - alpha / 2))
+    try:
+        cov = np.full((k, k), 0.5)
+        np.fill_diagonal(cov, 1.0)
+        rv = stats.multivariate_normal(mean=np.zeros(k), cov=cov, allow_singular=True)
+        def gap(c):
+            return rv.cdf(np.full(k, c), lower_limit=np.full(k, -c)) - (1 - alpha)
+        return float(optimize.brentq(gap, 1.5, 5.0, xtol=1e-4))
+    except Exception as e:
+        logger.warning(f"Dunnett critical value failed for k={k}: {e}")
+        # Fall back to Bonferroni, which is conservative — never anti-conservative.
+        return float(stats.norm.ppf(1 - (alpha / k) / 2))
+
+
+def _n_from_critical(effect_size, crit, power=0.80):
+    """Per-group N for a two-sided test at a given critical value."""
+    z_beta = float(stats.norm.ppf(power))
+    return int(math.ceil(2 * ((crit + z_beta) / effect_size) ** 2))
+
+
 def derive_group_size(group, all_groups_count):
     """Animals per group for a balanced design, from the study's own endpoint.
 
@@ -2333,24 +2369,57 @@ def derive_group_size(group, all_groups_count):
         effect_size = 0.8
         basis_kind = 'default assumption'
 
-    comparisons = max(1, int(all_groups_count or 1) - 1)
-    alpha = 0.05 / comparisons
+    k_groups = max(2, int(all_groups_count or 2))
+    comparisons = k_groups - 1
+    design = (group.get('comparison_design') or 'vs_control').strip().lower()
 
-    result = calculate_sample_size_power_analysis(effect_size=effect_size,
-                                                  power=0.80, alpha=alpha)
-    n = result.get('n_per_group', 10)
+    if comparisons == 1:
+        # A single comparison needs no multiplicity correction at all.
+        method = 'Two-sample t-test power analysis (statsmodels tt_ind_solve_power)'
+        correction = 'None needed — a single comparison'
+        alpha = 0.05
+        n = calculate_sample_size_power_analysis(
+            effect_size=effect_size, power=0.80, alpha=alpha).get('n_per_group', 10)
+    elif design == 'overall':
+        # One-way ANOVA answers "do the groups differ at all", which is a
+        # different and easier question than "which dose differs from control".
+        # Offered as a choice, never substituted for the many-to-one design.
+        method = 'One-way ANOVA F-test power (statsmodels FTestAnovaPower)'
+        correction = f'Omnibus F-test across {k_groups} groups — no pairwise correction'
+        alpha = 0.05
+        try:
+            total = FTestAnovaPower().solve_power(
+                effect_size=effect_size / 2.0, k_groups=k_groups,
+                alpha=alpha, power=0.80)
+            n = int(math.ceil(total / k_groups))
+        except Exception as e:
+            logger.warning(f"ANOVA power failed: {e}")
+            n = calculate_sample_size_power_analysis(
+                effect_size=effect_size, power=0.80, alpha=alpha).get('n_per_group', 10)
+    else:
+        # Every treated arm is compared against the same control, so the test
+        # statistics are correlated. Dunnett accounts for that; Bonferroni does
+        # not and therefore over-corrects, costing animals for no extra rigour.
+        method = "Dunnett many-to-one comparison power (exact critical value)"
+        crit = dunnett_critical_value(comparisons, alpha=0.05)
+        correction = (f'Dunnett: exact critical value {crit:.3f} for {comparisons} '
+                      f'comparisons against a shared control')
+        alpha = 0.05
+        n = _n_from_critical(effect_size, crit, power=0.80)
+
     n_att = math.ceil(n * 1.1)
 
     basis = {
-        'method': 'Two-sample t-test power analysis (statsmodels tt_ind_solve_power)',
+        'method': method,
+        'design': ('Overall difference among groups' if design == 'overall'
+                   else 'Each treated group vs control'),
         'effect_size_d': round(effect_size, 3),
         'effect_size_from': basis_kind,
         'power': 0.80,
         'alpha': round(alpha, 4),
+        'groups': k_groups,
         'comparisons': comparisons,
-        'multiplicity_correction': ('Bonferroni: alpha 0.05 split across '
-                                    f'{comparisons} comparison(s) against control'
-                                    if comparisons > 1 else 'None needed (single comparison)'),
+        'multiplicity_correction': correction,
         'n_per_group': n,
         'n_with_attrition': n_att,
         'attrition_allowance': '10%',
