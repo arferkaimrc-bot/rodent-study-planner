@@ -228,6 +228,9 @@ if VALIDATION_AVAILABLE:
         confidential = fields.Boolean()
         smiles = fields.Str(validate=validate.Length(max=1000))
         compound_class = fields.Str(validate=validate.Length(max=200))
+        # Drive the sample size from the real endpoint rather than a convention.
+        primary_endpoint = fields.Str(validate=validate.Length(max=200))
+        detectable_difference_pct = fields.Str(validate=validate.Length(max=20))
 
         sex = fields.Str(validate=validate.OneOf(['Male', 'Female', 'Mixed']))
         target_organ = fields.Str(validate=validate.Length(max=200))
@@ -2078,6 +2081,89 @@ def build_comprehensive_reference_corpus(group):
 # STATISTICAL FUNCTIONS
 # ============================================================================
 
+# ============================================================================
+# OUTCOME VARIABILITY MODEL (OVM)
+# ----------------------------------------------------------------------------
+# Sample size is driven by how much the measured outcome varies between animals.
+# A fixed Cohen's d = 0.8 returns the same N for every experiment, which is
+# wrong in both directions: body weight varies ~11% between mice while operant
+# behavioural counts vary ~100%. This predicts the coefficient of variation for
+# the specific measure/strain/sex so the required N follows the real experiment.
+#
+# Trained on curated phenotype databases (Mouse Phenome Database + RGD
+# PhenoMiner). It beats a per-measure median by ~11% on unseen strain/sex cells
+# but adds nothing for a measure absent from both — so an absent measure gets no
+# prediction and the caller says so, rather than guessing.
+# ============================================================================
+_OVM = None
+_OVM_META = None
+_OVM_MEASURES = None
+
+
+def _load_ovm():
+    """Load the variability model once, tolerating its absence."""
+    global _OVM, _OVM_META, _OVM_MEASURES
+    if _OVM is not None or _OVM is False:
+        return
+    try:
+        _OVM = joblib.load(os.path.join(Config.ML_MODEL_PATH, 'variability_model.pkl'))
+        _OVM_META = json.load(open(os.path.join(Config.ML_MODEL_PATH,
+                                                'variability_meta.json')))
+        _OVM_MEASURES = json.load(open(os.path.join(Config.ML_MODEL_PATH,
+                                                    'variability_measures.json')))
+        logger.info("Loaded Outcome Variability Model (%s rows, %s measures)",
+                    _OVM_META.get('n_rows'), _OVM_META.get('n_measures'))
+    except Exception as e:
+        _OVM = False
+        logger.warning(f"Outcome Variability Model unavailable: {e}")
+
+
+def predict_outcome_cv(measure, species, strain=None, sex=None):
+    """Predicted coefficient of variation (%) for one outcome measure.
+
+    Returns None when the measure is outside the training databases — held-out
+    testing showed the model adds nothing there, so reporting a number would be
+    false precision on the one figure an ethics committee scrutinises most.
+    """
+    _load_ovm()
+    if not _OVM or not measure:
+        return None
+    key = ((species or 'mouse').strip().lower(), measure.strip().lower())
+    if key not in _OVM['per_measure']:
+        return {'in_domain': False, 'measure': measure, 'species': key[0],
+                'reason': 'This outcome measure is not in the reference databases.'}
+    try:
+        import numpy as np
+        vocab, encoders = _OVM['encoders']
+        cats, base = _OVM['cats'], _OVM['per_measure'][key]
+        row = {'species': key[0], 'measure': key[1],
+               'strain': (strain or 'unspecified'), 'sex': (sex or 'unspecified'),
+               'intervention': '', 'method': ''}
+        x = np.zeros((1, 1 + len(cats) + 2), dtype=float)
+        x[0, 0] = np.log10(base)
+        log_global = np.log10(_OVM['global_median'])
+        for j, c in enumerate(cats, start=1):
+            v = row.get(c, '') or ''
+            x[0, j] = vocab[c].get(v, -1) if c in vocab else encoders[c].get(v, log_global)
+        x[0, len(cats) + 1] = 8          # typical group size
+        x[0, len(cats) + 2] = 0.0
+        cv = float(10 ** _OVM['model'].predict(x)[0])
+        n_obs = next((m['n_observations'] for m in (_OVM_MEASURES or [])
+                      if m['species'] == key[0] and m['measure'] == key[1]), None)
+        return {
+            'in_domain': True, 'measure': measure, 'species': key[0],
+            'cv_pct': round(cv, 1), 'measure_median_cv_pct': round(base, 1),
+            'n_reference_observations': n_obs,
+            'model': (_OVM_META or {}).get('name', 'Outcome Variability Model'),
+            'test_mae_cv_points': round((_OVM_META or {}).get(
+                'test_mae_cell_held_out', 0), 1),
+            'sources': (_OVM_META or {}).get('sources', []),
+        }
+    except Exception as e:
+        logger.warning(f"Variability prediction failed for {measure}: {e}")
+        return None
+
+
 def calculate_sample_size_power_analysis(
     effect_size: float,
     alpha: float = 0.05,
@@ -2625,9 +2711,22 @@ def get_prediction_and_suggestion(group, all_groups_count=1):
     # reviewer can reproduce the number independently.
     ml_prediction = None
     
-    # Cohen's conventional large effect; stated explicitly rather than
-    # silently varied, because changing it changes the required N.
-    effect_size = 0.8
+    # The effect size is the whole calculation. Where the researcher names a
+    # measurable endpoint and the difference worth detecting, d comes from the
+    # predicted variability of that endpoint; otherwise it falls back to Cohen's
+    # convention, and the basis says which of the two produced the number.
+    _measure = (group.get('primary_endpoint') or '').strip()
+    _target_pct = parse_float_safe(group.get('detectable_difference_pct'), 0)
+    _cv = predict_outcome_cv(_measure, group.get('species'),
+                             group.get('strain'), group.get('sex')) if _measure else None
+
+    if _cv and _cv.get('in_domain') and _target_pct > 0:
+        effect_size = (_target_pct / 100.0) / (_cv['cv_pct'] / 100.0)
+        basis_kind = 'predicted variability'
+    else:
+        effect_size = 0.8
+        basis_kind = 'default assumption'
+
     power_result = calculate_sample_size_power_analysis(
         effect_size=effect_size,
         power=0.80,
@@ -2636,14 +2735,34 @@ def get_prediction_and_suggestion(group, all_groups_count=1):
     suggested_n = power_result['n_per_group']
     sample_size_basis = {
         'method': 'Two-sample t-test power analysis (statsmodels tt_ind_solve_power)',
-        'effect_size_d': effect_size,
+        'effect_size_d': round(effect_size, 3),
+        'effect_size_from': basis_kind,
         'power': 0.80,
         'alpha': 0.05,
         'n_per_group': suggested_n,
         'attrition_allowance': '10%',
-        'note': ('Assumes a two-group comparison. Change the effect size and '
-                 'the required N changes — state the assumption in the protocol.'),
+        'variability': _cv,
+        'primary_endpoint': _measure or None,
+        'detectable_difference_pct': _target_pct or None,
     }
+    if basis_kind == 'predicted variability':
+        sample_size_basis['note'] = (
+            f"Detecting a {_target_pct:g}% difference in {_measure} at a predicted "
+            f"CV of {_cv['cv_pct']}% gives d = {effect_size:.2f}.")
+    elif _measure and _cv and not _cv.get('in_domain'):
+        sample_size_basis['note'] = (
+            f"'{_measure}' is not in the reference databases, so its variability "
+            "was not predicted. N falls back to Cohen's d = 0.8 — a convention, "
+            "not a measurement for this endpoint.")
+    elif _measure and not _target_pct:
+        sample_size_basis['note'] = (
+            "State the difference worth detecting to base N on the predicted "
+            "variability; until then N uses Cohen's d = 0.8.")
+    else:
+        sample_size_basis['note'] = (
+            "No primary endpoint given, so N uses Cohen's d = 0.8 — a convention, "
+            "not a measurement. Naming the endpoint and the difference worth "
+            "detecting bases N on published variability instead.")
     
     # Generate power curve data
     sample_sizes, powers = generate_power_curve_data(effect_size)
@@ -3545,6 +3664,22 @@ def generate_enhanced_docx(study_data):
 def home():
     """Serve main application page."""
     return render_template('index.html')
+
+@app.route('/variability-measures', methods=['GET'])
+def variability_measures():
+    """Outcome measures the variability model actually covers.
+
+    Only these can drive the sample size; anything else falls back to the
+    conventional effect size, so the form offers them explicitly rather than
+    letting a researcher type something the model will silently decline.
+    """
+    _load_ovm()
+    items = _OVM_MEASURES or []
+    species = (request.args.get('species') or '').strip().lower()
+    if species:
+        items = [m for m in items if m['species'] == species]
+    return jsonify({'count': len(items), 'measures': items[:400]})
+
 
 @app.route('/sample-types', methods=['GET'])
 def get_sample_types():

@@ -1,0 +1,139 @@
+{
+  "source": "Europe PMC open-access full text",
+  "measures": {
+    "body_weight": {
+      "median_cv_pct": 6.9,
+      "iqr": [
+        4.7,
+        9.6
+      ],
+      "n_rows": 104,
+      "n_papers": 26,
+      "pmcids": [
+        "PMC10468093",
+        "PMC10546263",
+        "PMC10622429",
+        "PMC11067048",
+        "PMC11070708",
+        "PMC11321955",
+        "PMC11608989",
+        "PMC11617080",
+        "PMC11759500",
+        "PMC11913664",
+        "PMC11946620",
+        "PMC11989200"
+      ]
+    },
+    "tumor_volume": {
+      "median_cv_pct": 11.2,
+      "iqr": [
+        1.7,
+        17.1
+      ],
+      "n_rows": 14,
+      "n_papers": 5,
+      "pmcids": [
+        "PMC12596851",
+        "PMC12663047",
+        "PMC12709788",
+        "PMC12929904",
+        "PMC12951942"
+      ]
+    },
+    "alt": {
+      "median_cv_pct": 12.1,
+      "iqr": [
+        7.0,
+        21.1
+      ],
+      "n_rows": 111,
+      "n_papers": 24,
+      "pmcids": [
+        "PMC12033067",
+        "PMC12137631",
+        "PMC12145642",
+        "PMC12185195",
+        "PMC12254974",
+        "PMC12275419",
+        "PMC12303912",
+        "PMC12312308",
+        "PMC12490870",
+        "PMC12511077",
+        "PMC12651932",
+        "PMC12658335"
+      ]
+    },
+    "ast": {
+      "median_cv_pct": 12.6,
+      "iqr": [
+        8.0,
+        22.1
+      ],
+      "n_rows": 119,
+      "n_papers": 22,
+      "pmcids": [
+        "PMC11435133",
+        "PMC12145642",
+        "PMC12230359",
+        "PMC12254974",
+        "PMC12275419",
+        "PMC12303912",
+        "PMC12312308",
+        "PMC12651932",
+        "PMC12657089",
+        "PMC12658335",
+        "PMC12753892",
+        "PMC12828853"
+      ]
+    },
+    "glucose": {
+      "median_cv_pct": 14.4,
+      "iqr": [
+        9.1,
+        23.6
+      ],
+      "n_rows": 160,
+      "n_papers": 38,
+      "pmcids": [
+        "PMC10983686",
+        "PMC11380866",
+        "PMC11824848",
+        "PMC11909573",
+        "PMC12071727",
+        "PMC12204525",
+        "PMC12230359",
+        "PMC12399224",
+        "PMC12436042",
+        "PMC12565004",
+        "PMC12583231",
+        "PMC12587256"
+      ]
+    },
+    "tumor_weight": {
+      "median_cv_pct": 25.4,
+      "iqr": [
+        17.1,
+        39.6
+      ],
+      "n_rows": 60,
+      "n_papers": 22,
+      "pmcids": [
+        "PMC10040556",
+        "PMC10131194",
+        "PMC10613212",
+        "PMC10751679",
+        "PMC10878215",
+        "PMC11035410",
+        "PMC11482627",
+        "PMC12559898",
+        "PMC12682305",
+        "PMC12701279",
+        "PMC12929904",
+        "PMC13191031"
+      ]
+    }
+  },
+  "total_rows": 568,
+  "total_papers": 117,
+  "method": "median CV% per outcome measure; strain/sex/species tested and found to add no predictive signal (held-out MAE worsened)"
+}

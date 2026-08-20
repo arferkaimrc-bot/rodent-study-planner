@@ -1179,6 +1179,24 @@
             }
         }
 
+        // Outcome measures the variability model covers. Offered as suggestions
+        // so a researcher picks one the model can actually answer for, rather
+        // than typing something it will decline.
+        async function loadVariabilityMeasures() {
+            try {
+                const res = await fetch('/variability-measures');
+                const data = await res.json();
+                const list = document.getElementById('ovm-measures');
+                if (!list) return;
+                list.innerHTML = data.measures.map(m =>
+                    `<option value="${m.measure}">${m.species} · CV ~${m.median_cv_pct}% · ${m.n_observations} measurements</option>`
+                ).join('');
+                console.log('✅ Variability measures loaded:', data.count);
+            } catch (err) {
+                console.error('Failed to load variability measures:', err);
+            }
+        }
+
         function showProgress(percent, text) {
             const container = document.getElementById('progress-container');
             const bar = document.getElementById('progress-bar');
@@ -1383,6 +1401,18 @@
                         <div class="form-group">
                             <label>Dose (mg/kg):</label>
                             <input type="number" class="dose" value="${data?.dose ?? (isControl ? '0' : '')}" min="0" step="0.1">
+                        </div>
+
+                        <div class="form-group">
+                            <label>Primary outcome measure <span style="font-weight:400;font-size:.8rem;color:var(--muted);">— drives the animal number</span>:</label>
+                            <input type="text" class="primary-endpoint" list="ovm-measures"
+                                   placeholder="e.g., body weight, blood glucose level, serum alanine aminotransferase activity"
+                                   value="${data?.primary_endpoint || ''}">
+                            <datalist id="ovm-measures"></datalist>
+                            <label style="font-size:.85rem;margin-top:6px;display:block;">Difference worth detecting (%):</label>
+                            <input type="number" class="detectable-difference" min="1" max="200" step="1"
+                                   placeholder="e.g., 20" value="${data?.detectable_difference_pct || ''}">
+                            <div class="sec-note" style="margin-top:5px;">Naming both bases the group size on published variability for this measure. Leave blank and it falls back to a conventional effect size.</div>
                         </div>
 
                         <div class="form-group">
@@ -1948,6 +1978,8 @@
                     confidential: !!groupEl.querySelector('.confidential-cb')?.checked,
                     smiles: (groupEl.querySelector('.compound-smiles')?.value || '').trim(),
                     compound_class: (groupEl.querySelector('.compound-class')?.value || '').trim(),
+                    primary_endpoint: (groupEl.querySelector('.primary-endpoint')?.value || '').trim(),
+                    detectable_difference_pct: (groupEl.querySelector('.detectable-difference')?.value || '').trim(),
                     dose: groupEl.querySelector('.dose').value,
                     vehicle: (groupEl.querySelector('.vehicle')?.value || '').trim(),
                     vehicle_volume: (groupEl.querySelector('.vehicle-volume')?.value || '').trim(),
@@ -2285,6 +2317,30 @@
                                     <div class="stile-value" style="color:#64748b;font-size:1rem;">No published evidence</div>
                                     <div class="stile-sub">${s.mortality_evidence.reason || 'Nothing found.'} The attrition allowance below is the standard default, with no compound-specific basis.</div>`}
                                     ${s.attrition_basis ? `<div class="stile-sub" style="margin-top:5px;">${s.attrition_basis}</div>` : ''}
+                                </div>` : ''}
+                                ${result.sample_size_basis ? `
+                                <div class="summary-tile wide">
+                                    <div class="stile-label">🔢 How the group size was derived</div>
+                                    ${(result.sample_size_basis.effect_size_from === 'predicted variability' && result.sample_size_basis.variability) ? `
+                                    <div class="stile-value" style="font-size:1rem;">
+                                        ${result.sample_size_basis.n_per_group} per group
+                                        <span style="font-weight:400;font-size:.85rem;color:var(--muted);">· d = ${result.sample_size_basis.effect_size_d} · 80% power · &alpha; 0.05</span>
+                                    </div>
+                                    <div class="stile-sub">
+                                        Predicted variability for <strong>${result.sample_size_basis.variability.measure}</strong>:
+                                        CV ${result.sample_size_basis.variability.cv_pct}%
+                                        (measure median ${result.sample_size_basis.variability.measure_median_cv_pct}%,
+                                        from ${result.sample_size_basis.variability.n_reference_observations} published measurements).
+                                        <span style="color:var(--info);font-weight:600;">🤖 ${result.sample_size_basis.variability.model}</span>
+                                        — held-out MAE ${result.sample_size_basis.variability.test_mae_cv_points} CV points.
+                                    </div>
+                                    <div class="stile-sub">Sources: ${(result.sample_size_basis.variability.sources || []).join(' · ')}</div>`
+                                    : `
+                                    <div class="stile-value" style="font-size:1rem;color:#64748b;">
+                                        ${result.sample_size_basis.n_per_group} per group
+                                        <span style="font-weight:400;font-size:.85rem;">· d = ${result.sample_size_basis.effect_size_d} (convention)</span>
+                                    </div>
+                                    <div class="stile-sub" style="color:#8a5a12;">${result.sample_size_basis.note}</div>`}
                                 </div>` : ''}
                                 ${s.clinical_trials && s.clinical_trials.total ? `
                                 <div class="summary-tile wide">
@@ -2758,6 +2814,7 @@
             // Ensure sample types are loaded before adding a group
             if (!sampleTypesLoaded) {
                 await loadSampleTypes();
+            loadVariabilityMeasures();
             }
             addGroup(false);
         };
@@ -2766,6 +2823,7 @@
         window.addEventListener('DOMContentLoaded', async () => {
             // Load sample types first
             await loadSampleTypes();
+            loadVariabilityMeasures();
             
             // Then add control group with sample types available
             addGroup(true);

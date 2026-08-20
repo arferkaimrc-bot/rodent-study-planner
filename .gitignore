@@ -25,3 +25,9 @@ DEPLOY_GOOGLE.md
 
 # Offline training data (only needed to rebuild models/domain refs)
 data/*.tab
+
+# Harvested phenotype data (only needed to retrain the variability model)
+data/mpd_variability.json
+data/rgd_variability.json
+data/variability_bodyweight.json
+data/variability_outcomes.json

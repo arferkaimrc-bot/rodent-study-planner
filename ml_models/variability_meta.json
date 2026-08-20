@@ -1,0 +1,35 @@
+{
+  "name": "Outcome Variability Model (OVM)",
+  "algorithm": "Histogram-based Gradient Boosting Regression Tree (scikit-learn HistGradientBoostingRegressor)",
+  "task": "regression",
+  "target": "log10(CV%)",
+  "sources": [
+    "Mouse Phenome Database (Jackson Laboratory)",
+    "Rat Genome Database PhenoMiner (MCW)"
+  ],
+  "n_rows": 259024,
+  "rows_by_species": {
+    "mouse": 246443,
+    "rat": 12581
+  },
+  "n_measures": 3961,
+  "n_strains": 2450,
+  "features": [
+    "measure median CV",
+    "species",
+    "measure",
+    "strain",
+    "sex",
+    "intervention",
+    "method",
+    "n",
+    "log mean"
+  ],
+  "test_mae_cell_held_out": 12.059723808062786,
+  "baseline_mae_cell_held_out": 13.486326512884856,
+  "improvement_cell_pct": 10.6,
+  "test_mae_study_held_out": 24.61804868454659,
+  "baseline_mae_study_held_out": 24.72771182539987,
+  "improvement_study_pct": 0.4,
+  "limitation": "Adds nothing for a measure absent from both databases; callers must fall back and say so."
+}
