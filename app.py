@@ -2216,6 +2216,77 @@ def calculate_sample_size_power_analysis(
             "n_per_group": 10
         }
 
+def derive_group_size(group, all_groups_count):
+    """Animals per group for a balanced design, from the study's own endpoint.
+
+    Every group gets the same N, control included. For a two-sample comparison
+    equal arms need the fewest animals in total: shrinking the control forces
+    the treated arms up by more than it saves, because power follows the
+    smaller arm. At d = 1.11 an equal design needs 14 + 14 = 28 animals, while
+    a half-size control needs 21 + 11 = 32.
+
+    With more than one treatment arm the comparisons against control multiply,
+    so alpha is Bonferroni-adjusted. Without that correction the study runs at a
+    higher false-positive rate than the 5% it claims, and the reported N is too
+    small for the design actually being proposed.
+
+    Returns (n_per_group, n_with_attrition, basis).
+    """
+    measure = (group.get('primary_endpoint') or '').strip()
+    target_pct = parse_float_safe(group.get('detectable_difference_pct'), 0)
+    cv = predict_outcome_cv(measure, group.get('species'), group.get('strain'),
+                            group.get('sex')) if measure else None
+
+    if cv and cv.get('in_domain') and target_pct > 0:
+        effect_size = (target_pct / 100.0) / (cv['cv_pct'] / 100.0)
+        basis_kind = 'predicted variability'
+    else:
+        effect_size = 0.8
+        basis_kind = 'default assumption'
+
+    comparisons = max(1, int(all_groups_count or 1) - 1)
+    alpha = 0.05 / comparisons
+
+    result = calculate_sample_size_power_analysis(effect_size=effect_size,
+                                                  power=0.80, alpha=alpha)
+    n = result.get('n_per_group', 10)
+    n_att = math.ceil(n * 1.1)
+
+    basis = {
+        'method': 'Two-sample t-test power analysis (statsmodels tt_ind_solve_power)',
+        'effect_size_d': round(effect_size, 3),
+        'effect_size_from': basis_kind,
+        'power': 0.80,
+        'alpha': round(alpha, 4),
+        'comparisons': comparisons,
+        'multiplicity_correction': ('Bonferroni: alpha 0.05 split across '
+                                    f'{comparisons} comparison(s) against control'
+                                    if comparisons > 1 else 'None needed (single comparison)'),
+        'n_per_group': n,
+        'n_with_attrition': n_att,
+        'attrition_allowance': '10%',
+        'allocation': 'Balanced — every group, control included, gets the same N',
+        'variability': cv,
+        'primary_endpoint': measure or None,
+        'detectable_difference_pct': target_pct or None,
+    }
+    if basis_kind == 'predicted variability':
+        basis['note'] = (f"Detecting a {target_pct:g}% difference in {measure} at a "
+                         f"predicted CV of {cv['cv_pct']}% gives d = {effect_size:.2f}.")
+    elif measure and cv and not cv.get('in_domain'):
+        basis['note'] = (f"'{measure}' is not in the reference databases, so its "
+                         "variability was not predicted. N falls back to Cohen's "
+                         "d = 0.8 — a convention, not a measurement for this endpoint.")
+    elif measure and not target_pct:
+        basis['note'] = ("State the difference worth detecting to base N on the "
+                         "predicted variability; until then N uses Cohen's d = 0.8.")
+    else:
+        basis['note'] = ("No primary endpoint given, so N uses Cohen's d = 0.8 — a "
+                         "convention, not a measurement. Naming the endpoint and the "
+                         "difference worth detecting bases N on published variability.")
+    return n, n_att, basis
+
+
 def generate_power_curve_data(effect_size, alpha=0.05):
     """Generate data for power curve visualization."""
     sample_sizes = np.arange(5, 31, 1)
@@ -2667,12 +2738,11 @@ def get_prediction_and_suggestion(group, all_groups_count=1):
         }
 
     if is_control:
-        # The control gets the same power-analysis N (balanced design). The
-        # number is NOT clamped: capping it would quietly report a group size
-        # that does not deliver the stated 80% power.
-        _pa = calculate_sample_size_power_analysis(effect_size=0.8, power=0.80, alpha=0.05)
-        _ctrl_n = _pa.get('n_per_group', 8) if _pa.get('success') else 8
-        _ctrl_range = f"{_ctrl_n}-{math.ceil(_ctrl_n * 1.1)}"
+        # The control runs through the SAME derivation as the treated groups —
+        # same endpoint, same effect size, same multiplicity correction — so a
+        # balanced design cannot drift apart group by group.
+        _ctrl_n, _ctrl_att, _ctrl_basis = derive_group_size(group, all_groups_count)
+        _ctrl_range = f"{_ctrl_n}-{_ctrl_att}"
         # Add blood warnings for control group too
         warnings = []
         if blood_calc['needed'] and blood_calc['safety_color'] != 'green':
@@ -2691,6 +2761,7 @@ def get_prediction_and_suggestion(group, all_groups_count=1):
             "warnings": warnings,
             "suggested_corrections": [],
             "statistical_test": recommend_statistical_test(all_groups_count),
+            "sample_size_basis": _ctrl_basis,
             "blood_calculation": blood_calc,  # ✅ NOW INCLUDED FOR CONTROL
             "ml_prediction": None,
             "all_sources": {
@@ -2711,59 +2782,10 @@ def get_prediction_and_suggestion(group, all_groups_count=1):
     # reviewer can reproduce the number independently.
     ml_prediction = None
     
-    # The effect size is the whole calculation. Where the researcher names a
-    # measurable endpoint and the difference worth detecting, d comes from the
-    # predicted variability of that endpoint; otherwise it falls back to Cohen's
-    # convention, and the basis says which of the two produced the number.
-    _measure = (group.get('primary_endpoint') or '').strip()
-    _target_pct = parse_float_safe(group.get('detectable_difference_pct'), 0)
-    _cv = predict_outcome_cv(_measure, group.get('species'),
-                             group.get('strain'), group.get('sex')) if _measure else None
+    suggested_n, n_with_attrition, sample_size_basis = derive_group_size(
+        group, all_groups_count)
+    effect_size = sample_size_basis['effect_size_d']
 
-    if _cv and _cv.get('in_domain') and _target_pct > 0:
-        effect_size = (_target_pct / 100.0) / (_cv['cv_pct'] / 100.0)
-        basis_kind = 'predicted variability'
-    else:
-        effect_size = 0.8
-        basis_kind = 'default assumption'
-
-    power_result = calculate_sample_size_power_analysis(
-        effect_size=effect_size,
-        power=0.80,
-        alpha=0.05
-    )
-    suggested_n = power_result['n_per_group']
-    sample_size_basis = {
-        'method': 'Two-sample t-test power analysis (statsmodels tt_ind_solve_power)',
-        'effect_size_d': round(effect_size, 3),
-        'effect_size_from': basis_kind,
-        'power': 0.80,
-        'alpha': 0.05,
-        'n_per_group': suggested_n,
-        'attrition_allowance': '10%',
-        'variability': _cv,
-        'primary_endpoint': _measure or None,
-        'detectable_difference_pct': _target_pct or None,
-    }
-    if basis_kind == 'predicted variability':
-        sample_size_basis['note'] = (
-            f"Detecting a {_target_pct:g}% difference in {_measure} at a predicted "
-            f"CV of {_cv['cv_pct']}% gives d = {effect_size:.2f}.")
-    elif _measure and _cv and not _cv.get('in_domain'):
-        sample_size_basis['note'] = (
-            f"'{_measure}' is not in the reference databases, so its variability "
-            "was not predicted. N falls back to Cohen's d = 0.8 — a convention, "
-            "not a measurement for this endpoint.")
-    elif _measure and not _target_pct:
-        sample_size_basis['note'] = (
-            "State the difference worth detecting to base N on the predicted "
-            "variability; until then N uses Cohen's d = 0.8.")
-    else:
-        sample_size_basis['note'] = (
-            "No primary endpoint given, so N uses Cohen's d = 0.8 — a convention, "
-            "not a measurement. Naming the endpoint and the difference worth "
-            "detecting bases N on published variability instead.")
-    
     # Generate power curve data
     sample_sizes, powers = generate_power_curve_data(effect_size)
     power_curve = {
@@ -2771,8 +2793,6 @@ def get_prediction_and_suggestion(group, all_groups_count=1):
         'powers': powers,
         'effect_size': effect_size
     }
-    
-    n_with_attrition = math.ceil(suggested_n * 1.1)
     
     # Rationale states the method and its assumptions, nothing more.
     rationale_parts = []
@@ -2835,7 +2855,7 @@ def get_prediction_and_suggestion(group, all_groups_count=1):
         "summary": build_summary(f"{suggested_n}-{n_with_attrition}"),
         "sample_size_for_group": f"{suggested_n}-{n_with_attrition} {animal_word} per group",
         "recommended_mice": f"{suggested_n}-{n_with_attrition}",
-        "sample_size_details": power_result,
+        "sample_size_details": sample_size_basis,
         "power_curve": power_curve,
         "toxicity_risk": 15,
         "rationale": rationale,

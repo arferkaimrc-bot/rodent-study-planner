@@ -1011,6 +1011,17 @@
                 <input id="study-design-other" type="text" placeholder="Enter the study design type"
                     style="display:none;width:100%;padding:12px 14px;margin-top:6px;border:1.5px solid var(--border);border-radius:10px;">
             </div>
+
+            <div class="form-group">
+                <label>Primary outcome measure <span style="font-weight:400;font-size:.8rem;color:var(--muted);">— one per study; this is what the group size is calculated from</span></label>
+                <input id="study-primary-endpoint" type="text" list="ovm-measures"
+                       placeholder="e.g., body weight, blood glucose level, serum alanine aminotransferase activity">
+                <datalist id="ovm-measures"></datalist>
+                <label style="margin-top:8px;display:block;">Difference worth detecting (%)</label>
+                <input id="study-detectable-difference" type="number" min="1" max="200" step="1"
+                       placeholder="e.g., 20">
+                <div class="sec-note" style="margin-top:5px;">Naming both bases every group size on published variability for this measure. Leave blank and it falls back to a conventional effect size.</div>
+            </div>
         </div>
 
         <!-- Groups Section -->
@@ -1401,18 +1412,6 @@
                         <div class="form-group">
                             <label>Dose (mg/kg):</label>
                             <input type="number" class="dose" value="${data?.dose ?? (isControl ? '0' : '')}" min="0" step="0.1">
-                        </div>
-
-                        <div class="form-group">
-                            <label>Primary outcome measure <span style="font-weight:400;font-size:.8rem;color:var(--muted);">— drives the animal number</span>:</label>
-                            <input type="text" class="primary-endpoint" list="ovm-measures"
-                                   placeholder="e.g., body weight, blood glucose level, serum alanine aminotransferase activity"
-                                   value="${data?.primary_endpoint || ''}">
-                            <datalist id="ovm-measures"></datalist>
-                            <label style="font-size:.85rem;margin-top:6px;display:block;">Difference worth detecting (%):</label>
-                            <input type="number" class="detectable-difference" min="1" max="200" step="1"
-                                   placeholder="e.g., 20" value="${data?.detectable_difference_pct || ''}">
-                            <div class="sec-note" style="margin-top:5px;">Naming both bases the group size on published variability for this measure. Leave blank and it falls back to a conventional effect size.</div>
                         </div>
 
                         <div class="form-group">
@@ -1978,8 +1977,10 @@
                     confidential: !!groupEl.querySelector('.confidential-cb')?.checked,
                     smiles: (groupEl.querySelector('.compound-smiles')?.value || '').trim(),
                     compound_class: (groupEl.querySelector('.compound-class')?.value || '').trim(),
-                    primary_endpoint: (groupEl.querySelector('.primary-endpoint')?.value || '').trim(),
-                    detectable_difference_pct: (groupEl.querySelector('.detectable-difference')?.value || '').trim(),
+                    // Study-level: the same endpoint is stamped onto every group so
+                    // the design stays balanced instead of drifting group by group.
+                    primary_endpoint: (document.getElementById('study-primary-endpoint')?.value || '').trim(),
+                    detectable_difference_pct: (document.getElementById('study-detectable-difference')?.value || '').trim(),
                     dose: groupEl.querySelector('.dose').value,
                     vehicle: (groupEl.querySelector('.vehicle')?.value || '').trim(),
                     vehicle_volume: (groupEl.querySelector('.vehicle-volume')?.value || '').trim(),
