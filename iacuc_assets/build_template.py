@@ -7,7 +7,7 @@ Run ONCE (or whenever the blank form is updated) to produce
 It inserts Jinja tags into the exact answer cells identified by table index,
 touching ONLY the text of answer paragraphs — never styles, fonts, colours,
 column widths or page layout — so the rendered document is visually identical
-to the original blank form ("الشكل والالوان ونوع الخط ... الصيغة النهائية word").
+to the original blank form: same layout, colours and fonts, delivered as Word.
 
 Usage:
     python iacuc_assets/build_template.py "/path/to/blank_form.docx"

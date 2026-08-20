@@ -2817,7 +2817,7 @@ def get_prediction_and_suggestion(group, all_groups_count=1):
 
     score = max(0, min(100, score))
 
-    # اختر أول ورقة من الكوربس وحاول تبني رابط آمن لها
+    # Take the first paper from the corpus and build a safe link to it
     all_papers_list = ref_corpus.get('all_papers', [])
     first_paper = all_papers_list[0] if all_papers_list else None
     if first_paper:
@@ -3893,13 +3893,37 @@ def ratelimit_handler(e):
 # GHS acute oral toxicity classification (UN GHS Rev.10, Table 3.1.1) —
 # the cut-off values are the published regulatory bands, not a scale of ours.
 # (upper LD50 bound mg/kg, category label, GHS hazard statement, internal risk score)
+# upper bound, GHS category, dose band, the category's own hazard word, H code,
+# internal risk weight used only to scale welfare monitoring.
 _GHS_ORAL_BANDS = [
-    (5,     'Category 1', '≤ 5 mg/kg',        'H300 — Fatal if swallowed',          90),
-    (50,    'Category 2', '> 5–50 mg/kg',     'H300 — Fatal if swallowed',          80),
-    (300,   'Category 3', '> 50–300 mg/kg',   'H301 — Toxic if swallowed',          65),
-    (2000,  'Category 4', '> 300–2000 mg/kg', 'H302 — Harmful if swallowed',        45),
-    (5000,  'Category 5', '> 2000–5000 mg/kg', 'H303 — May be harmful if swallowed', 30),
+    (5,     'Category 1', '≤ 5 mg/kg',         'Fatal',         'H300', 90),
+    (50,    'Category 2', '> 5–50 mg/kg',      'Fatal',         'H300', 80),
+    (300,   'Category 3', '> 50–300 mg/kg',    'Toxic',         'H301', 65),
+    (2000,  'Category 4', '> 300–2000 mg/kg',  'Harmful',       'H302', 45),
+    (5000,  'Category 5', '> 2000–5000 mg/kg', 'May be harmful', 'H303', 30),
 ]
+
+
+# The published source behind every acute-toxicity label the platform shows, so
+# a reviewer can check the band rather than take the classification on trust.
+_GHS_REFERENCE = {
+    'citation': ('United Nations. Globally Harmonized System of Classification and '
+                 'Labelling of Chemicals (GHS), Rev.10 (2023), Chapter 3.1 "Acute '
+                 'toxicity", Table 3.1.1 — acute toxicity hazard categories and '
+                 'the (approximate) LD50 values defining them.'),
+    'url': 'https://unece.org/transport/dangerous-goods/ghs-rev10-2023',
+    'pdf_en': 'https://unece.org/sites/default/files/2023-07/GHS%20Rev10e.pdf',
+    'publisher': 'UNECE',
+}
+
+
+def ghs_scale_table():
+    """Every oral band, so the researcher sees where their compound falls."""
+    rows = [{'category': label, 'band': band, 'word': word, 'code': code}
+            for _, label, band, word, code, _ in _GHS_ORAL_BANDS]
+    rows.append({'category': 'Not classified', 'band': '> 5000 mg/kg',
+                 'word': 'Not classified', 'code': '—'})
+    return rows
 
 
 def ld50_to_ghs(ld50_mg_kg):
@@ -3913,13 +3937,16 @@ def ld50_to_ghs(ld50_mg_kg):
         ld50 = float(ld50_mg_kg)
     except (TypeError, ValueError):
         return None
-    for upper, label, band, hazard, risk in _GHS_ORAL_BANDS:
+    for upper, label, band, word, code, risk in _GHS_ORAL_BANDS:
         if ld50 <= upper:
-            return {'category': label, 'band': band, 'hazard': hazard,
-                    'risk_score': risk, 'scale': 'GHS acute oral toxicity (UN GHS Rev.10)'}
+            return {'category': label, 'band': band, 'word': word,
+                    'hazard': f'{code} — {word} if swallowed',
+                    'risk_score': risk, 'scale': 'GHS acute oral toxicity (UN GHS Rev.10)',
+                    'reference': _GHS_REFERENCE, 'scale_table': ghs_scale_table()}
     return {'category': 'Not classified', 'band': '> 5000 mg/kg',
-            'hazard': 'Below the GHS classification threshold',
-            'risk_score': 20, 'scale': 'GHS acute oral toxicity (UN GHS Rev.10)'}
+            'word': 'Not classified', 'hazard': 'Below the GHS classification threshold',
+            'risk_score': 20, 'scale': 'GHS acute oral toxicity (UN GHS Rev.10)',
+            'reference': _GHS_REFERENCE, 'scale_table': ghs_scale_table()}
 
 
 def round_sig(x, sig=2):

@@ -2231,8 +2231,24 @@
                                 </div>
                                 <div class="summary-tile">
                                     <div class="stile-label">☠️ Acute toxicity <span style="font-weight:400;">(GHS oral)</span></div>
-                                    <div class="stile-value" style="color:${toxColor};font-size:${ghs ? '1.05rem' : '1rem'};">${toxText}</div>
-                                    ${ghs ? `<div class="stile-sub" title="${ghs.scale}">${ghs.band} · ${ghs.hazard}<br>LD50 ${s.ld50_mg_kg} mg/kg${s.ld50_error_band ? ' (' + s.ld50_error_band + ')' : ''} · ${s.toxicity_source === 'experimental' ? '📗 published experimental value' : '📘 model estimate'}</div>`
+                                    <div class="stile-value" style="color:${toxColor};font-size:${ghs ? '1.05rem' : '1rem'};">${toxText}${ghs && ghs.word && ghs.word !== ghs.category ? ` <span style="font-weight:600;">· ${ghs.word}</span>` : ''}</div>
+                                    ${ghs ? `<div class="stile-sub" title="${ghs.scale}">${ghs.band}<br>LD50 ${s.ld50_mg_kg} mg/kg${s.ld50_error_band ? ' (' + s.ld50_error_band + ')' : ''} · ${s.toxicity_source === 'experimental' ? '📗 published experimental value' : '📘 model estimate'}</div>
+                                    ${ghs.scale_table ? `<details style="margin-top:7px;">
+                                        <summary style="cursor:pointer;font-size:.8rem;color:var(--info);">Where does this category come from?</summary>
+                                        <table style="width:100%;border-collapse:collapse;margin-top:6px;font-size:.78rem;">
+                                            <tr style="text-align:left;border-bottom:1px solid var(--border);">
+                                                <th style="padding:3px 6px;">Category</th><th style="padding:3px 6px;">Oral LD50</th><th style="padding:3px 6px;">Hazard</th></tr>
+                                            ${ghs.scale_table.map(b => `<tr style="${b.category === ghs.category ? 'background:#fef3c7;font-weight:700;' : ''}">
+                                                <td style="padding:3px 6px;">${b.category}</td>
+                                                <td style="padding:3px 6px;">${b.band}</td>
+                                                <td style="padding:3px 6px;">${b.word}</td></tr>`).join('')}
+                                        </table>
+                                        ${ghs.reference ? `<div class="stile-sub" style="margin-top:6px;">
+                                            ${ghs.reference.citation}
+                                            <br><a href="${ghs.reference.url}" target="_blank" rel="noopener" style="color:var(--info);">${ghs.reference.publisher} page</a>
+                                            · <a href="${ghs.reference.pdf_en}" target="_blank" rel="noopener" style="color:var(--info);">full text (EN)</a>
+                                        </div>` : ''}
+                                    </details>` : ''}`
                                       : `<div class="stile-sub">No published LD50 found, and the compound is outside the model’s applicability domain — nothing is estimated.</div>`}
                                 </div>
                                 ${s.solubility ? (s.solubility.out_of_domain ? `
