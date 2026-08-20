@@ -2216,8 +2216,16 @@ def predict_outcome_cv(measure, species, strain=None, sex=None):
         import numpy as np
         vocab, encoders = _OVM['encoders']
         cats, base = _OVM['cats'], _OVM['per_measure'][key]
+        # The form sends "Male"; the databases record "m" for mouse rows and
+        # "male" for rat rows. Without normalising, capitalisation alone would
+        # change the predicted CV, and therefore the animal number.
+        _sex_raw = (sex or '').strip().lower()
+        _sex = {'male': 'm', 'm': 'm', 'female': 'f', 'f': 'f',
+                'mixed': 'both', 'both': 'both'}.get(_sex_raw, 'not specified')
+        if key[0] == 'rat' and _sex in ('m', 'f'):
+            _sex = 'male' if _sex == 'm' else 'female'
         row = {'species': key[0], 'measure': key[1],
-               'strain': (strain or 'unspecified'), 'sex': (sex or 'unspecified'),
+               'strain': (strain or '').strip() or 'unspecified', 'sex': _sex,
                'intervention': '', 'method': ''}
         x = np.zeros((1, 1 + len(cats) + 2), dtype=float)
         x[0, 0] = np.log10(base)
