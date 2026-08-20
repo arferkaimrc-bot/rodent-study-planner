@@ -205,6 +205,12 @@
  },
  {
   "species": "rat",
+  "measure": "plasma creatinine level",
+  "median_cv_pct": 17.83,
+  "n_observations": 800
+ },
+ {
+  "species": "rat",
   "measure": "respiration rate",
   "median_cv_pct": 15.3,
   "n_observations": 798
@@ -355,8 +361,26 @@
  },
  {
   "species": "rat",
+  "measure": "urine total protein excretion rate",
+  "median_cv_pct": 38.38,
+  "n_observations": 531
+ },
+ {
+  "species": "rat",
   "measure": "percent change in ventilation",
   "median_cv_pct": 20.48,
+  "n_observations": 524
+ },
+ {
+  "species": "rat",
+  "measure": "percent change in respiration rate",
+  "median_cv_pct": 18.4,
+  "n_observations": 524
+ },
+ {
+  "species": "rat",
+  "measure": "percent change in tidal volume",
+  "median_cv_pct": 15.23,
   "n_observations": 524
  },
  {
@@ -450,6 +474,12 @@
   "n_observations": 464
  },
  {
+  "species": "rat",
+  "measure": "heart effluent lactate dehydrogenase activity level normalized to heart weight",
+  "median_cv_pct": 45.59,
+  "n_observations": 454
+ },
+ {
   "species": "mouse",
   "measure": "measured hemoglobin (hgb)",
   "median_cv_pct": 5.33,
@@ -474,6 +504,18 @@
   "n_observations": 432
  },
  {
+  "species": "rat",
+  "measure": "absolute change in mean arterial blood pressure",
+  "median_cv_pct": 53.69,
+  "n_observations": 429
+ },
+ {
+  "species": "rat",
+  "measure": "urine albumin excretion rate",
+  "median_cv_pct": 53.83,
+  "n_observations": 428
+ },
+ {
   "species": "mouse",
   "measure": "rbc corpuscular hemoglobin concentration mean (chcm)",
   "median_cv_pct": 2.02,
@@ -496,6 +538,12 @@
   "measure": "distance traveled in 1 min",
   "median_cv_pct": 38.85,
   "n_observations": 410
+ },
+ {
+  "species": "rat",
+  "measure": "serum albumin level",
+  "median_cv_pct": 5.49,
+  "n_observations": 408
  },
  {
   "species": "mouse",
@@ -525,6 +573,12 @@
   "species": "mouse",
   "measure": "reticulocyte differential (retic; percentage of total rbc)",
   "median_cv_pct": 26.1,
+  "n_observations": 382
+ },
+ {
+  "species": "rat",
+  "measure": "serum urea nitrogen level",
+  "median_cv_pct": 15.45,
   "n_observations": 382
  },
  {
@@ -570,6 +624,12 @@
   "n_observations": 366
  },
  {
+  "species": "rat",
+  "measure": "serum glucose level",
+  "median_cv_pct": 13.51,
+  "n_observations": 365
+ },
+ {
   "species": "mouse",
   "measure": "calculated hemoglobin (hgb)",
   "median_cv_pct": 3.86,
@@ -606,6 +666,12 @@
   "n_observations": 355
  },
  {
+  "species": "rat",
+  "measure": "serum alanine aminotransferase activity level",
+  "median_cv_pct": 21.83,
+  "n_observations": 354
+ },
+ {
   "species": "mouse",
   "measure": "preference for nacl (sodium chloride) solutions",
   "median_cv_pct": 29.6,
@@ -615,6 +681,12 @@
   "species": "mouse",
   "measure": "preference for cacl2 (calcium chloride) solutions",
   "median_cv_pct": 44.35,
+  "n_observations": 352
+ },
+ {
+  "species": "rat",
+  "measure": "urine sodium excretion rate",
+  "median_cv_pct": 33.05,
   "n_observations": 352
  },
  {
@@ -642,9 +714,21 @@
   "n_observations": 346
  },
  {
+  "species": "rat",
+  "measure": "serum alkaline phosphatase activity level",
+  "median_cv_pct": 15.33,
+  "n_observations": 346
+ },
+ {
   "species": "mouse",
   "measure": "monocyte count (mono; units per volume x 10<sup>3</sup>)",
   "median_cv_pct": 35.7,
+  "n_observations": 344
+ },
+ {
+  "species": "rat",
+  "measure": "acetylcholine-induced blood vessel dilation expressed as percent reduction of  the force generated in a pre-constricted blood vessel",
+  "median_cv_pct": 22.87,
   "n_observations": 344
  },
  {
@@ -652,6 +736,18 @@
   "measure": "airway resistance (h<sub>2</sub>0 pressure)",
   "median_cv_pct": 23.9,
   "n_observations": 343
+ },
+ {
+  "species": "rat",
+  "measure": "absolute change in heart rate",
+  "median_cv_pct": 76.17,
+  "n_observations": 343
+ },
+ {
+  "species": "rat",
+  "measure": "serum aspartate aminotransferase activity level",
+  "median_cv_pct": 23.11,
+  "n_observations": 342
  },
  {
   "species": "rat",
@@ -672,9 +768,33 @@
   "n_observations": 340
  },
  {
+  "species": "rat",
+  "measure": "serum sodium level",
+  "median_cv_pct": 1.48,
+  "n_observations": 338
+ },
+ {
   "species": "mouse",
   "measure": "dose response, mean number of infusions (intravenous self administration) on last two stabilized sessions, cc",
   "median_cv_pct": 55.68,
+  "n_observations": 337
+ },
+ {
+  "species": "rat",
+  "measure": "serum chloride level",
+  "median_cv_pct": 2.0,
+  "n_observations": 337
+ },
+ {
+  "species": "rat",
+  "measure": "serum calcium level",
+  "median_cv_pct": 4.14,
+  "n_observations": 337
+ },
+ {
+  "species": "rat",
+  "measure": "hypoxia-induced blood vessel dilation expressed as percent reduction of the force generated in a pre-constricted blood vessel",
+  "median_cv_pct": 39.39,
   "n_observations": 337
  },
  {
@@ -685,8 +805,26 @@
  },
  {
   "species": "rat",
+  "measure": "serum potassium level",
+  "median_cv_pct": 11.52,
+  "n_observations": 334
+ },
+ {
+  "species": "rat",
+  "measure": "plasma triglyceride level",
+  "median_cv_pct": 23.73,
+  "n_observations": 334
+ },
+ {
+  "species": "rat",
   "measure": "blood monocyte count",
   "median_cv_pct": 70.98,
+  "n_observations": 333
+ },
+ {
+  "species": "rat",
+  "measure": "logarithm of the concentration of acetylcholine at which the reduction in force during dilation of a blood vessel is half the maximum value (log ec50)",
+  "median_cv_pct": 3.48,
   "n_observations": 333
  },
  {
@@ -696,10 +834,22 @@
   "n_observations": 330
  },
  {
+  "species": "rat",
+  "measure": "serum phosphate level",
+  "median_cv_pct": 10.73,
+  "n_observations": 330
+ },
+ {
   "species": "mouse",
   "measure": "percentage of time spent freezing at 14 mo of age, day 2 contextual fear memory, 10 min test",
   "median_cv_pct": 53.76,
   "n_observations": 328
+ },
+ {
+  "species": "rat",
+  "measure": "serum bicarbonate level",
+  "median_cv_pct": 12.1,
+  "n_observations": 325
  },
  {
   "species": "mouse",
@@ -720,10 +870,28 @@
   "n_observations": 320
  },
  {
+  "species": "rat",
+  "measure": "plasma total cholesterol level",
+  "median_cv_pct": 9.03,
+  "n_observations": 320
+ },
+ {
   "species": "mouse",
   "measure": "spleen weight",
   "median_cv_pct": 16.7,
   "n_observations": 318
+ },
+ {
+  "species": "rat",
+  "measure": "serum globulin level",
+  "median_cv_pct": 9.46,
+  "n_observations": 318
+ },
+ {
+  "species": "rat",
+  "measure": "logarithm of the concentration of phenylephrine at which the force of blood vessel contraction is half the maximum value (log ec50)",
+  "median_cv_pct": 3.8,
+  "n_observations": 317
  },
  {
   "species": "mouse",
@@ -738,6 +906,18 @@
   "n_observations": 314
  },
  {
+  "species": "rat",
+  "measure": "concentration of phenylephrine at which the force of blood vessel contraction is half the maximum value (ec50)",
+  "median_cv_pct": 68.2,
+  "n_observations": 313
+ },
+ {
+  "species": "rat",
+  "measure": "maximum contractile force per wet weight of aorta",
+  "median_cv_pct": 28.11,
+  "n_observations": 311
+ },
+ {
   "species": "mouse",
   "measure": "dissolved-ionized carbon dioxide (co<sub>2</sub>)",
   "median_cv_pct": 16.0,
@@ -748,6 +928,12 @@
   "measure": "glucose (blood glu, 16h fast)",
   "median_cv_pct": 20.3,
   "n_observations": 305
+ },
+ {
+  "species": "rat",
+  "measure": "concentration of acetylcholine at which the reduction in force during dilation of a blood vessel is half the maximum value (ec50)",
+  "median_cv_pct": 52.44,
+  "n_observations": 304
  },
  {
   "species": "mouse",
@@ -1002,10 +1188,22 @@
   "n_observations": 261
  },
  {
+  "species": "rat",
+  "measure": "plasma urea nitrogen level",
+  "median_cv_pct": 9.14,
+  "n_observations": 261
+ },
+ {
   "species": "mouse",
   "measure": "inspiratory flow rate",
   "median_cv_pct": 24.1,
   "n_observations": 260
+ },
+ {
+  "species": "rat",
+  "measure": "plasma high density lipoprotein cholesterol level",
+  "median_cv_pct": 8.63,
+  "n_observations": 259
  },
  {
   "species": "mouse",
@@ -1086,6 +1284,12 @@
   "n_observations": 253
  },
  {
+  "species": "rat",
+  "measure": "percent change in heart rate",
+  "median_cv_pct": 26.48,
+  "n_observations": 252
+ },
+ {
   "species": "mouse",
   "measure": "submitted_id",
   "median_cv_pct": 8.95,
@@ -1122,6 +1326,24 @@
   "n_observations": 247
  },
  {
+  "species": "rat",
+  "measure": "time to peak heart contraction",
+  "median_cv_pct": 12.0,
+  "n_observations": 247
+ },
+ {
+  "species": "rat",
+  "measure": "heart contraction pressure",
+  "median_cv_pct": 26.56,
+  "n_observations": 247
+ },
+ {
+  "species": "rat",
+  "measure": "percent change in arterial blood flow rate",
+  "median_cv_pct": 27.39,
+  "n_observations": 247
+ },
+ {
   "species": "mouse",
   "measure": "adrenal weights",
   "median_cv_pct": 10.55,
@@ -1152,6 +1374,36 @@
   "n_observations": 245
  },
  {
+  "species": "rat",
+  "measure": "time to onset of heart contraction",
+  "median_cv_pct": 15.59,
+  "n_observations": 245
+ },
+ {
+  "species": "rat",
+  "measure": "calculated pulmonary vascular resistance normalized to body weight",
+  "median_cv_pct": 16.74,
+  "n_observations": 245
+ },
+ {
+  "species": "rat",
+  "measure": "methylene blue metabolism-surface area product without auto-oxidation",
+  "median_cv_pct": 23.04,
+  "n_observations": 245
+ },
+ {
+  "species": "rat",
+  "measure": "methylene blue metabolism-surface area product after auto-oxidation",
+  "median_cv_pct": 22.67,
+  "n_observations": 245
+ },
+ {
+  "species": "rat",
+  "measure": "fractional change in blood vessel diameter per unit change in intravascular pressure",
+  "median_cv_pct": 37.46,
+  "n_observations": 245
+ },
+ {
   "species": "mouse",
   "measure": "percentage of motile sperm that are 'hyperactivated'",
   "median_cv_pct": 43.54,
@@ -1170,6 +1422,30 @@
   "n_observations": 244
  },
  {
+  "species": "rat",
+  "measure": "fapgg metabolism-surface area product",
+  "median_cv_pct": 26.54,
+  "n_observations": 244
+ },
+ {
+  "species": "rat",
+  "measure": "methylene blue to fapgg metabolism-surface area product ratio",
+  "median_cv_pct": 22.82,
+  "n_observations": 244
+ },
+ {
+  "species": "rat",
+  "measure": "dose of methacholine at which pulmonary conductance is half its pretreatment value",
+  "median_cv_pct": 60.18,
+  "n_observations": 244
+ },
+ {
+  "species": "rat",
+  "measure": "creatinine clearance",
+  "median_cv_pct": 28.16,
+  "n_observations": 244
+ },
+ {
   "species": "mouse",
   "measure": "respiratory cycle",
   "median_cv_pct": 18.5,
@@ -1182,6 +1458,18 @@
   "n_observations": 243
  },
  {
+  "species": "rat",
+  "measure": "plasma low density lipoprotein cholesterol level",
+  "median_cv_pct": 18.18,
+  "n_observations": 243
+ },
+ {
+  "species": "rat",
+  "measure": "heart left ventricle infarction weight to total heart left ventricle weight ratio",
+  "median_cv_pct": 73.9,
+  "n_observations": 243
+ },
+ {
   "species": "mouse",
   "measure": "large unstained cells count (luc; units per volume x 10<sup>3</sup>)",
   "median_cv_pct": 47.9,
@@ -1191,6 +1479,12 @@
   "species": "rat",
   "measure": "brain weight to body weight ratio",
   "median_cv_pct": 4.94,
+  "n_observations": 241
+ },
+ {
+  "species": "rat",
+  "measure": "timed urine volume to body weight ratio",
+  "median_cv_pct": 26.32,
   "n_observations": 241
  },
  {
@@ -1219,6 +1513,12 @@
  },
  {
   "species": "rat",
+  "measure": "percent change in left ventricular systolic blood pressure",
+  "median_cv_pct": 20.66,
+  "n_observations": 239
+ },
+ {
+  "species": "rat",
   "measure": "brain wet weight",
   "median_cv_pct": 2.67,
   "n_observations": 238
@@ -1227,6 +1527,12 @@
   "species": "rat",
   "measure": "blood lymphocyte count to total leukocyte count ratio",
   "median_cv_pct": 4.9,
+  "n_observations": 238
+ },
+ {
+  "species": "rat",
+  "measure": "urine sodium excretion rate to body weight ratio",
+  "median_cv_pct": 24.16,
   "n_observations": 238
  },
  {
@@ -1275,6 +1581,12 @@
   "species": "mouse",
   "measure": "acoustic startle response (asr) evoked by 120 db sound pressure level",
   "median_cv_pct": 42.8,
+  "n_observations": 235
+ },
+ {
+  "species": "rat",
+  "measure": "percent change in left ventricular developed pressure",
+  "median_cv_pct": 45.24,
   "n_observations": 235
  },
  {
@@ -1351,6 +1663,12 @@
  },
  {
   "species": "rat",
+  "measure": "blood segmented neutrophil count to total leukocyte count ratio",
+  "median_cv_pct": 29.41,
+  "n_observations": 230
+ },
+ {
+  "species": "rat",
   "measure": "blood ph",
   "median_cv_pct": 0.41,
   "n_observations": 229
@@ -1372,6 +1690,24 @@
   "measure": "grip strength, peak tension over 3 trials",
   "median_cv_pct": 9.43,
   "n_observations": 228
+ },
+ {
+  "species": "rat",
+  "measure": "plasma albumin to plasma total protein ratio",
+  "median_cv_pct": 4.96,
+  "n_observations": 228
+ },
+ {
+  "species": "rat",
+  "measure": "urine chloride excretion rate to body weight ratio",
+  "median_cv_pct": 21.5,
+  "n_observations": 227
+ },
+ {
+  "species": "rat",
+  "measure": "urine potassium excretion rate to body weight ratio",
+  "median_cv_pct": 21.88,
+  "n_observations": 227
  },
  {
   "species": "rat",
@@ -1524,6 +1860,12 @@
   "n_observations": 212
  },
  {
+  "species": "rat",
+  "measure": "plasma total bilirubin level",
+  "median_cv_pct": 33.33,
+  "n_observations": 212
+ },
+ {
   "species": "mouse",
   "measure": "percentage of time sleeping, after sleep deprivation",
   "median_cv_pct": 28.05,
@@ -1606,6 +1948,12 @@
   "measure": "both testes wet weight",
   "median_cv_pct": 5.05,
   "n_observations": 206
+ },
+ {
+  "species": "rat",
+  "measure": "both testes wet weight to body weight ratio",
+  "median_cv_pct": 5.68,
+  "n_observations": 201
  },
  {
   "species": "mouse",
@@ -2202,6 +2550,12 @@
   "n_observations": 162
  },
  {
+  "species": "rat",
+  "measure": "absolute change in body temperature",
+  "median_cv_pct": 121.47,
+  "n_observations": 162
+ },
+ {
   "species": "mouse",
   "measure": "distance traveled, first 30 min (pre-injection), on successive days, cocaine group, do",
   "median_cv_pct": 39.52,
@@ -2694,6 +3048,12 @@
   "n_observations": 138
  },
  {
+  "species": "rat",
+  "measure": "heart left ventricle weight to body weight ratio",
+  "median_cv_pct": 7.73,
+  "n_observations": 138
+ },
+ {
   "species": "mouse",
   "measure": "vertical activity (beam breaks) at night, basal activity test, for 48h",
   "median_cv_pct": 30.39,
@@ -2721,6 +3081,12 @@
   "species": "mouse",
   "measure": "percent fat, whole body with head (nmr)",
   "median_cv_pct": 15.25,
+  "n_observations": 136
+ },
+ {
+  "species": "rat",
+  "measure": "logarithm of the concentration of sodium nitroprusside at which the reduction in force during dilation of a blood vessel is half the maximum value (log ec50)",
+  "median_cv_pct": 3.34,
   "n_observations": 136
  },
  {
@@ -2769,6 +3135,12 @@
   "species": "mouse",
   "measure": "overt vacuous chewing movements, 15 min test, treatment group, post-treatment",
   "median_cv_pct": 77.77,
+  "n_observations": 132
+ },
+ {
+  "species": "rat",
+  "measure": "urine creatinine excretion rate",
+  "median_cv_pct": 13.95,
   "n_observations": 132
  },
  {
@@ -3390,6 +3762,18 @@
   "n_observations": 117
  },
  {
+  "species": "rat",
+  "measure": "concentration of sodium nitroprusside at which the reduction in force during dilation of a blood vessel is half the maximum value (ec50)",
+  "median_cv_pct": 64.01,
+  "n_observations": 117
+ },
+ {
+  "species": "rat",
+  "measure": "urine potassium excretion rate",
+  "median_cv_pct": 26.0,
+  "n_observations": 117
+ },
+ {
   "species": "mouse",
   "measure": "body weight at 22 wks of age",
   "median_cv_pct": 7.65,
@@ -3543,6 +3927,12 @@
   "species": "mouse",
   "measure": "percentage of time freezing to context on day 2",
   "median_cv_pct": 99.45,
+  "n_observations": 116
+ },
+ {
+  "species": "rat",
+  "measure": "sodium nitroprusside-induced blood vessel dilation expressed as percent reduction of the force generated in a pre-constricted blood vessel",
+  "median_cv_pct": 1.69,
   "n_observations": 116
  },
  {
@@ -3873,6 +4263,12 @@
   "species": "mouse",
   "measure": "igg glycan peak 25, core fucose with 2 glcnac antennae, 2 galactoses, 2 sialic acids (relative abundance)",
   "median_cv_pct": 33.05,
+  "n_observations": 112
+ },
+ {
+  "species": "rat",
+  "measure": "food intake rate",
+  "median_cv_pct": 16.22,
   "n_observations": 112
  },
  {
@@ -4776,6 +5172,12 @@
   "n_observations": 98
  },
  {
+  "species": "rat",
+  "measure": "scotopic a wave amplitude of erg waveform",
+  "median_cv_pct": 38.48,
+  "n_observations": 98
+ },
+ {
   "species": "mouse",
   "measure": "latency of nociception to mechanical pressure on the tail",
   "median_cv_pct": 62.5,
@@ -5004,6 +5406,12 @@
   "n_observations": 94
  },
  {
+  "species": "rat",
+  "measure": "heart left ventricle end-diastolic diameter",
+  "median_cv_pct": 8.29,
+  "n_observations": 94
+ },
+ {
   "species": "mouse",
   "measure": "daily food intake, basal activity test, for 2 days, 23 wks of age",
   "median_cv_pct": 16.62,
@@ -5184,6 +5592,12 @@
   "n_observations": 92
  },
  {
+  "species": "rat",
+  "measure": "heart left ventricle weight",
+  "median_cv_pct": 6.08,
+  "n_observations": 92
+ },
+ {
   "species": "mouse",
   "measure": "percentage of splenic cd8+ t cells that are cd44+ (memory precursor panel)",
   "median_cv_pct": 11.88,
@@ -5289,6 +5703,12 @@
   "species": "mouse",
   "measure": "amplitude of r-wave",
   "median_cv_pct": 28.75,
+  "n_observations": 86
+ },
+ {
+  "species": "rat",
+  "measure": "heart left ventricle fractional shortening",
+  "median_cv_pct": 13.37,
   "n_observations": 86
  },
  {
@@ -5523,6 +5943,12 @@
   "species": "mouse",
   "measure": "habituation: ratio of final 4 trials to initial 4 trials (<1.0=diminished asr)",
   "median_cv_pct": 49.8,
+  "n_observations": 80
+ },
+ {
+  "species": "rat",
+  "measure": "measurement of minimal mechanical stimulus needed to elicit evasive reaction",
+  "median_cv_pct": 11.5,
   "n_observations": 80
  },
  {
@@ -6288,6 +6714,48 @@
   "n_observations": 70
  },
  {
+  "species": "rat",
+  "measure": "total body water mass",
+  "median_cv_pct": 7.96,
+  "n_observations": 70
+ },
+ {
+  "species": "rat",
+  "measure": "total body fat-free mass",
+  "median_cv_pct": 7.68,
+  "n_observations": 70
+ },
+ {
+  "species": "rat",
+  "measure": "total body fat mass to total body mass ratio",
+  "median_cv_pct": 11.75,
+  "n_observations": 70
+ },
+ {
+  "species": "rat",
+  "measure": "total body fat-free mass to total body mass ratio",
+  "median_cv_pct": 1.7,
+  "n_observations": 70
+ },
+ {
+  "species": "rat",
+  "measure": "total body water mass to total body mass ratio",
+  "median_cv_pct": 6.0,
+  "n_observations": 70
+ },
+ {
+  "species": "rat",
+  "measure": "total body lean mass",
+  "median_cv_pct": 7.35,
+  "n_observations": 70
+ },
+ {
+  "species": "rat",
+  "measure": "total body lean mass to total body mass ratio",
+  "median_cv_pct": 2.15,
+  "n_observations": 70
+ },
+ {
   "species": "mouse",
   "measure": "airway resistance (naive, untreated, h<sub>2</sub>o pressure)",
   "median_cv_pct": 16.5,
@@ -6678,6 +7146,18 @@
   "n_observations": 63
  },
  {
+  "species": "rat",
+  "measure": "creatinine clearance to body weight ratio",
+  "median_cv_pct": 22.33,
+  "n_observations": 63
+ },
+ {
+  "species": "rat",
+  "measure": "kidney sclerotic glomeruli count to total glomeruli count ratio",
+  "median_cv_pct": 51.96,
+  "n_observations": 63
+ },
+ {
   "species": "mouse",
   "measure": "total number of trials (reversal learning assay), founders",
   "median_cv_pct": 58.62,
@@ -6756,6 +7236,12 @@
   "n_observations": 62
  },
  {
+  "species": "rat",
+  "measure": "heart left ventricle end-systolic diameter",
+  "median_cv_pct": 15.46,
+  "n_observations": 62
+ },
+ {
   "species": "mouse",
   "measure": "total number of omissions (successful response in central nose poke hole, but no response in flanking hole within 30 s) (reversal learning assay), founders",
   "median_cv_pct": 87.69,
@@ -6795,6 +7281,18 @@
   "species": "rat",
   "measure": "mammary tumor number",
   "median_cv_pct": 60.23,
+  "n_observations": 61
+ },
+ {
+  "species": "rat",
+  "measure": "single kidney wet weight to body weight ratio",
+  "median_cv_pct": 8.23,
+  "n_observations": 61
+ },
+ {
+  "species": "rat",
+  "measure": "post-insult time to onset of experimental arthritis",
+  "median_cv_pct": 15.43,
   "n_observations": 61
  },
  {
@@ -7524,6 +8022,12 @@
   "n_observations": 55
  },
  {
+  "species": "rat",
+  "measure": "bone mineral density",
+  "median_cv_pct": 4.66,
+  "n_observations": 55
+ },
+ {
   "species": "mouse",
   "measure": "grid habituation, distance traveled",
   "median_cv_pct": 39.6,
@@ -7659,6 +8163,24 @@
   "species": "mouse",
   "measure": "plasma bile acid 7-ketodeoxycholic acid amount, glucose kinetic test, at 20 wks of age, after 60 min",
   "median_cv_pct": 80.52,
+  "n_observations": 52
+ },
+ {
+  "species": "rat",
+  "measure": "liver weight to body weight ratio",
+  "median_cv_pct": 5.6,
+  "n_observations": 52
+ },
+ {
+  "species": "rat",
+  "measure": "water drink intake rate",
+  "median_cv_pct": 21.97,
+  "n_observations": 52
+ },
+ {
+  "species": "rat",
+  "measure": "heart right ventricle weight to body weight ratio",
+  "median_cv_pct": 10.34,
   "n_observations": 52
  },
  {
@@ -7887,6 +8409,12 @@
   "species": "mouse",
   "measure": "liver inflammation (score: 0-4)",
   "median_cv_pct": 93.3,
+  "n_observations": 50
+ },
+ {
+  "species": "rat",
+  "measure": "food intake weight to body weight ratio",
+  "median_cv_pct": 15.71,
   "n_observations": 50
  },
  {
@@ -8202,6 +8730,30 @@
   "n_observations": 48
  },
  {
+  "species": "rat",
+  "measure": "left ventricular end-diastolic blood pressure",
+  "median_cv_pct": 67.33,
+  "n_observations": 48
+ },
+ {
+  "species": "rat",
+  "measure": "total volumetric bone mineral density",
+  "median_cv_pct": 4.01,
+  "n_observations": 48
+ },
+ {
+  "species": "rat",
+  "measure": "calories absorbed to calorie intake ratio",
+  "median_cv_pct": 1.83,
+  "n_observations": 48
+ },
+ {
+  "species": "rat",
+  "measure": "defecation rate by mass",
+  "median_cv_pct": 17.2,
+  "n_observations": 48
+ },
+ {
   "species": "mouse",
   "measure": "percent hematocrit (hct), ratio of post- to pre-infection",
   "median_cv_pct": 13.61,
@@ -8325,6 +8877,24 @@
   "species": "rat",
   "measure": "blood glucose level area under curve (auc)",
   "median_cv_pct": 8.48,
+  "n_observations": 47
+ },
+ {
+  "species": "rat",
+  "measure": "body weight gain",
+  "median_cv_pct": 25.65,
+  "n_observations": 47
+ },
+ {
+  "species": "rat",
+  "measure": "average daily food intake weight",
+  "median_cv_pct": 10.16,
+  "n_observations": 47
+ },
+ {
+  "species": "rat",
+  "measure": "calculated water drink intake volume",
+  "median_cv_pct": 13.88,
   "n_observations": 47
  },
  {
@@ -8475,6 +9045,12 @@
   "species": "mouse",
   "measure": "percent duration in light zone, 10 min",
   "median_cv_pct": 68.6,
+  "n_observations": 45
+ },
+ {
+  "species": "rat",
+  "measure": "glomerular filtration rate",
+  "median_cv_pct": 23.84,
   "n_observations": 45
  },
  {
@@ -8769,6 +9345,18 @@
   "species": "mouse",
   "measure": "percentage of events that are omission errors, stimulus duration variable",
   "median_cv_pct": 22.0,
+  "n_observations": 43
+ },
+ {
+  "species": "rat",
+  "measure": "plasma free fatty acids level",
+  "median_cv_pct": 25.51,
+  "n_observations": 43
+ },
+ {
+  "species": "rat",
+  "measure": "retroperitoneal fat pad weight to body weight ratio",
+  "median_cv_pct": 16.85,
   "n_observations": 43
  },
  {
@@ -9630,6 +10218,12 @@
   "n_observations": 42
  },
  {
+  "species": "rat",
+  "measure": "renal filtration fraction",
+  "median_cv_pct": 14.79,
+  "n_observations": 42
+ },
+ {
   "species": "mouse",
   "measure": "plasma choline amount, post-diet",
   "median_cv_pct": 20.19,
@@ -9825,6 +10419,12 @@
   "species": "rat",
   "measure": "blood total cholesterol level",
   "median_cv_pct": 11.07,
+  "n_observations": 41
+ },
+ {
+  "species": "rat",
+  "measure": "maximum rate of positive change in left ventricular blood pressure",
+  "median_cv_pct": 12.81,
   "n_observations": 41
  },
  {
@@ -10122,6 +10722,12 @@
   "n_observations": 39
  },
  {
+  "species": "rat",
+  "measure": "blood hemoglobin a1c level",
+  "median_cv_pct": 7.65,
+  "n_observations": 39
+ },
+ {
   "species": "mouse",
   "measure": "punctate cataract",
   "median_cv_pct": 138.0,
@@ -10416,6 +11022,12 @@
   "n_observations": 37
  },
  {
+  "species": "rat",
+  "measure": "serum free fatty acids level",
+  "median_cv_pct": 21.95,
+  "n_observations": 37
+ },
+ {
   "species": "mouse",
   "measure": "fat tissue mass",
   "median_cv_pct": 20.26,
@@ -10557,6 +11169,30 @@
   "species": "mouse",
   "measure": "number of tests with squeaks",
   "median_cv_pct": 82.8,
+  "n_observations": 36
+ },
+ {
+  "species": "rat",
+  "measure": "epididymal fat pad weight to body weight ratio",
+  "median_cv_pct": 8.7,
+  "n_observations": 36
+ },
+ {
+  "species": "rat",
+  "measure": "plasma corticosterone level",
+  "median_cv_pct": 40.79,
+  "n_observations": 36
+ },
+ {
+  "species": "rat",
+  "measure": "maximum rate of negative change in left ventricular blood pressure",
+  "median_cv_pct": 14.53,
+  "n_observations": 36
+ },
+ {
+  "species": "rat",
+  "measure": "blood band neutrophil count to total leukocyte count ratio",
+  "median_cv_pct": 100.0,
   "n_observations": 36
  },
  {
@@ -10968,6 +11604,24 @@
   "n_observations": 35
  },
  {
+  "species": "rat",
+  "measure": "left ventricular end-systolic blood pressure",
+  "median_cv_pct": 9.46,
+  "n_observations": 35
+ },
+ {
+  "species": "rat",
+  "measure": "maximum body weight loss to initial body weight ratio",
+  "median_cv_pct": 56.94,
+  "n_observations": 35
+ },
+ {
+  "species": "rat",
+  "measure": "heart left ventricle end-diastolic  posterior wall thickness",
+  "median_cv_pct": 17.57,
+  "n_observations": 35
+ },
+ {
   "species": "mouse",
   "measure": "percentage of invariant nk t cells that express cd4, peripheral blood",
   "median_cv_pct": 5.64,
@@ -11199,6 +11853,18 @@
   "species": "mouse",
   "measure": "number fecal boli, 5 min trial",
   "median_cv_pct": 70.4,
+  "n_observations": 34
+ },
+ {
+  "species": "rat",
+  "measure": "pituitary gland wet weight",
+  "median_cv_pct": 12.02,
+  "n_observations": 34
+ },
+ {
+  "species": "rat",
+  "measure": "time to locate a hidden target platform in a morris water maze apparatus",
+  "median_cv_pct": 51.89,
   "n_observations": 34
  },
  {
@@ -11850,6 +12516,12 @@
   "n_observations": 31
  },
  {
+  "species": "rat",
+  "measure": "time constant of left ventricular pressure decay",
+  "median_cv_pct": 14.24,
+  "n_observations": 31
+ },
+ {
   "species": "mouse",
   "measure": "brain diazepam and metabolite concentration, 30 min post-injection",
   "median_cv_pct": 33.5,
@@ -12036,6 +12708,24 @@
   "n_observations": 30
  },
  {
+  "species": "rat",
+  "measure": "middle cerebral artery inner diameter",
+  "median_cv_pct": 7.47,
+  "n_observations": 30
+ },
+ {
+  "species": "rat",
+  "measure": "heart interventricular end-systolic septal wall thickness",
+  "median_cv_pct": 12.5,
+  "n_observations": 30
+ },
+ {
+  "species": "rat",
+  "measure": "kidney wet weight to body weight ratio",
+  "median_cv_pct": 6.01,
+  "n_observations": 30
+ },
+ {
   "species": "mouse",
   "measure": "blood interleukin-6 (il-6) amount",
   "median_cv_pct": 32.99,
@@ -12087,6 +12777,24 @@
   "species": "rat",
   "measure": "red blood cell distribution width-coefficient of variation",
   "median_cv_pct": 4.05,
+  "n_observations": 29
+ },
+ {
+  "species": "rat",
+  "measure": "tibia length",
+  "median_cv_pct": 2.17,
+  "n_observations": 29
+ },
+ {
+  "species": "rat",
+  "measure": "absolute change in systolic blood pressure",
+  "median_cv_pct": 15.91,
+  "n_observations": 29
+ },
+ {
+  "species": "rat",
+  "measure": "heart right ventricle weight",
+  "median_cv_pct": 9.07,
   "n_observations": 29
  },
  {
@@ -12387,6 +13095,12 @@
   "species": "rat",
   "measure": "blood insulin level",
   "median_cv_pct": 38.86,
+  "n_observations": 28
+ },
+ {
+  "species": "rat",
+  "measure": "plasma very low density lipoprotein cholesterol level",
+  "median_cv_pct": 26.93,
   "n_observations": 28
  },
  {
@@ -12696,6 +13410,18 @@
   "n_observations": 27
  },
  {
+  "species": "rat",
+  "measure": "urine total protein excretion rate to body weight ratio",
+  "median_cv_pct": 28.07,
+  "n_observations": 27
+ },
+ {
+  "species": "rat",
+  "measure": "thyroid gland wet weight",
+  "median_cv_pct": 12.81,
+  "n_observations": 27
+ },
+ {
   "species": "mouse",
   "measure": "blood macrophage inflammatory protein 1 beta subunit (mip1 beta) amount",
   "median_cv_pct": 19.78,
@@ -12843,6 +13569,12 @@
   "species": "rat",
   "measure": "body mass index",
   "median_cv_pct": 3.35,
+  "n_observations": 26
+ },
+ {
+  "species": "rat",
+  "measure": "plasma aldosterone level",
+  "median_cv_pct": 42.84,
   "n_observations": 26
  },
  {
@@ -13011,6 +13743,18 @@
   "species": "mouse",
   "measure": "relative lung weight, treated group",
   "median_cv_pct": 9.0,
+  "n_observations": 25
+ },
+ {
+  "species": "rat",
+  "measure": "fetal body weight",
+  "median_cv_pct": 10.04,
+  "n_observations": 25
+ },
+ {
+  "species": "rat",
+  "measure": "retinal outer nuclear layer thickness",
+  "median_cv_pct": 11.74,
   "n_observations": 25
  },
  {
@@ -13356,6 +14100,84 @@
   "n_observations": 24
  },
  {
+  "species": "rat",
+  "measure": "blood albumin level",
+  "median_cv_pct": 7.14,
+  "n_observations": 24
+ },
+ {
+  "species": "rat",
+  "measure": "thymus weight to body weight ratio",
+  "median_cv_pct": 45.45,
+  "n_observations": 24
+ },
+ {
+  "species": "rat",
+  "measure": "thymus wet weight",
+  "median_cv_pct": 10.48,
+  "n_observations": 24
+ },
+ {
+  "species": "rat",
+  "measure": "artery wall thickness to artery inner diameter ratio",
+  "median_cv_pct": 11.55,
+  "n_observations": 24
+ },
+ {
+  "species": "rat",
+  "measure": "heart ventricle septal wall thickness",
+  "median_cv_pct": 7.42,
+  "n_observations": 24
+ },
+ {
+  "species": "rat",
+  "measure": "inguinal fat pad weight",
+  "median_cv_pct": 14.73,
+  "n_observations": 24
+ },
+ {
+  "species": "rat",
+  "measure": "heart left ventricle end-systolic posterior wall thickness",
+  "median_cv_pct": 19.05,
+  "n_observations": 24
+ },
+ {
+  "species": "rat",
+  "measure": "post-insult time to onset of t-cell lymphoma",
+  "median_cv_pct": 15.48,
+  "n_observations": 24
+ },
+ {
+  "species": "rat",
+  "measure": "renal fat pad weight",
+  "median_cv_pct": 17.31,
+  "n_observations": 24
+ },
+ {
+  "species": "rat",
+  "measure": "glomerular filtration rate to body weight ratio",
+  "median_cv_pct": 12.21,
+  "n_observations": 24
+ },
+ {
+  "species": "rat",
+  "measure": "body weight gain to calories absorbed ratio",
+  "median_cv_pct": 9.85,
+  "n_observations": 24
+ },
+ {
+  "species": "rat",
+  "measure": "interscapular fat pad weight",
+  "median_cv_pct": 11.55,
+  "n_observations": 24
+ },
+ {
+  "species": "rat",
+  "measure": "timed urine mass",
+  "median_cv_pct": 26.3,
+  "n_observations": 24
+ },
+ {
   "species": "mouse",
   "measure": "urine puddle count, 5 min test, day 1",
   "median_cv_pct": 116.0,
@@ -13467,6 +14289,18 @@
   "species": "mouse",
   "measure": "mir-15b, hippocampal microrna expression, relative",
   "median_cv_pct": 23.8,
+  "n_observations": 23
+ },
+ {
+  "species": "rat",
+  "measure": "femur length",
+  "median_cv_pct": 1.82,
+  "n_observations": 23
+ },
+ {
+  "species": "rat",
+  "measure": "plasma osmolality",
+  "median_cv_pct": 3.17,
   "n_observations": 23
  },
  {
@@ -13686,6 +14520,36 @@
   "n_observations": 22
  },
  {
+  "species": "rat",
+  "measure": "blood alanine aminotransferase activity level",
+  "median_cv_pct": 11.88,
+  "n_observations": 22
+ },
+ {
+  "species": "rat",
+  "measure": "blood aspartate aminotransferase activity level",
+  "median_cv_pct": 14.72,
+  "n_observations": 22
+ },
+ {
+  "species": "rat",
+  "measure": "plasma phospholipid level",
+  "median_cv_pct": 13.45,
+  "n_observations": 22
+ },
+ {
+  "species": "rat",
+  "measure": "percentage of study population displaying trigeminal nerve neurilemmomas at a point in time",
+  "median_cv_pct": 19.32,
+  "n_observations": 22
+ },
+ {
+  "species": "rat",
+  "measure": "heart left ventricle weight to tibia length ratio",
+  "median_cv_pct": 8.12,
+  "n_observations": 22
+ },
+ {
   "species": "mouse",
   "measure": "immunoglobulin g1 (plasma igg1)",
   "median_cv_pct": 44.1,
@@ -13749,6 +14613,48 @@
   "species": "rat",
   "measure": "serum high density lipoprotein cholesterol level",
   "median_cv_pct": 12.59,
+  "n_observations": 21
+ },
+ {
+  "species": "rat",
+  "measure": "heart left ventricle relative wall thickness",
+  "median_cv_pct": 14.05,
+  "n_observations": 21
+ },
+ {
+  "species": "rat",
+  "measure": "resting tone of middle cerebral artery",
+  "median_cv_pct": 13.89,
+  "n_observations": 21
+ },
+ {
+  "species": "rat",
+  "measure": "creatinine clearance to total kidney weight ratio",
+  "median_cv_pct": 23.52,
+  "n_observations": 21
+ },
+ {
+  "species": "rat",
+  "measure": "blood very low density lipoprotein triglyceride level",
+  "median_cv_pct": 36.18,
+  "n_observations": 21
+ },
+ {
+  "species": "rat",
+  "measure": "blood high density lipoprotein particle diameter",
+  "median_cv_pct": 0.83,
+  "n_observations": 21
+ },
+ {
+  "species": "rat",
+  "measure": "blood low density lipoprotein particle diameter",
+  "median_cv_pct": 1.45,
+  "n_observations": 21
+ },
+ {
+  "species": "rat",
+  "measure": "blood very low density lipoprotein particle diameter",
+  "median_cv_pct": 2.28,
   "n_observations": 21
  },
  {
@@ -14289,6 +15195,78 @@
   "species": "mouse",
   "measure": "stride frequency, mean number of steps per second for rear paws",
   "median_cv_pct": 8.71,
+  "n_observations": 20
+ },
+ {
+  "species": "rat",
+  "measure": "kidney glomerulus diameter",
+  "median_cv_pct": 4.94,
+  "n_observations": 20
+ },
+ {
+  "species": "rat",
+  "measure": "experimental autoimmune encephalomyelitis duration",
+  "median_cv_pct": 55.27,
+  "n_observations": 20
+ },
+ {
+  "species": "rat",
+  "measure": "liver cholesterol level",
+  "median_cv_pct": 16.84,
+  "n_observations": 20
+ },
+ {
+  "species": "rat",
+  "measure": "renal vascular resistance",
+  "median_cv_pct": 18.2,
+  "n_observations": 20
+ },
+ {
+  "species": "rat",
+  "measure": "water intake drink rate to body weight ratio",
+  "median_cv_pct": 39.19,
+  "n_observations": 20
+ },
+ {
+  "species": "rat",
+  "measure": "single nephron glomerular filtration rate",
+  "median_cv_pct": 23.19,
+  "n_observations": 20
+ },
+ {
+  "species": "rat",
+  "measure": "tibialis anterior muscle weight to body weight ratio",
+  "median_cv_pct": 6.0,
+  "n_observations": 20
+ },
+ {
+  "species": "rat",
+  "measure": "extensor digitorum longus muscle weight to body weight ratio",
+  "median_cv_pct": 7.72,
+  "n_observations": 20
+ },
+ {
+  "species": "rat",
+  "measure": "efferent arteriolar resistance",
+  "median_cv_pct": 23.48,
+  "n_observations": 20
+ },
+ {
+  "species": "rat",
+  "measure": "retinal outer layer thickness",
+  "median_cv_pct": 5.79,
+  "n_observations": 20
+ },
+ {
+  "species": "rat",
+  "measure": "retinal inner layer thickness",
+  "median_cv_pct": 7.44,
+  "n_observations": 20
+ },
+ {
+  "species": "rat",
+  "measure": "heart left ventricle end-diastolic diameter to posterior wall thickness ratio",
+  "median_cv_pct": 16.05,
   "n_observations": 20
  }
 ]
