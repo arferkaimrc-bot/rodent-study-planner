@@ -7,13 +7,13 @@
     "Mouse Phenome Database (Jackson Laboratory)",
     "Rat Genome Database PhenoMiner (MCW)"
   ],
-  "n_rows": 259024,
+  "n_rows": 282387,
   "rows_by_species": {
     "mouse": 246443,
-    "rat": 12581
+    "rat": 35944
   },
-  "n_measures": 3961,
-  "n_strains": 2450,
+  "n_measures": 4098,
+  "n_strains": 2640,
   "features": [
     "measure median CV",
     "species",
@@ -25,11 +25,11 @@
     "n",
     "log mean"
   ],
-  "test_mae_cell_held_out": 12.059723808062786,
-  "baseline_mae_cell_held_out": 13.486326512884856,
-  "improvement_cell_pct": 10.6,
-  "test_mae_study_held_out": 24.61804868454659,
-  "baseline_mae_study_held_out": 24.72771182539987,
-  "improvement_study_pct": 0.4,
+  "test_mae_cell_held_out": 11.497316197637296,
+  "baseline_mae_cell_held_out": 12.826758560855556,
+  "improvement_cell_pct": 10.4,
+  "test_mae_study_held_out": 16.392686809776063,
+  "baseline_mae_study_held_out": 16.7476709883333,
+  "improvement_study_pct": 2.1,
   "limitation": "Adds nothing for a measure absent from both databases; callers must fall back and say so."
 }
