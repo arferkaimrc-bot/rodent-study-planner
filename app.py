@@ -2118,6 +2118,81 @@ def _load_ovm():
         logger.warning(f"Outcome Variability Model unavailable: {e}")
 
 
+# Short forms researchers actually type, mapped to the vocabulary the reference
+# databases use. Without this, "ALT" or "glucose" silently miss and the group
+# size falls back to a convention while looking like a real answer.
+_MEASURE_ALIASES = {
+    'bw': 'body weight', 'body wt': 'body weight', 'bodyweight': 'body weight',
+    'weight': 'body weight', 'body mass': 'body weight',
+    'alt': 'alanine transaminase', 'sgpt': 'alanine transaminase',
+    'gpt': 'alanine transaminase', 'serum alt': 'alanine transaminase',
+    'ast': 'aspartate transaminase', 'sgot': 'aspartate transaminase',
+    'got': 'aspartate transaminase', 'serum ast': 'aspartate transaminase',
+    'glucose': 'blood glucose', 'blood sugar': 'blood glucose',
+    'bun': 'blood urea nitrogen', 'urea': 'blood urea nitrogen',
+    'hb': 'hemoglobin', 'haemoglobin': 'hemoglobin',
+    'sbp': 'systolic blood pressure', 'dbp': 'diastolic blood pressure',
+    'hr': 'heart rate', 'chol': 'cholesterol', 'tg': 'triglyceride',
+}
+
+
+def _normalise_measure(text):
+    """Lowercase, drop bracketed units, unify spellings, collapse whitespace."""
+    t = (text or '').strip().lower()
+    t = re.sub(r'\([^)]*\)', ' ', t)          # "body weight (g)" -> "body weight"
+    t = t.replace('tumour', 'tumor').replace('haemo', 'hemo')
+    t = re.sub(r'[^a-z0-9 ]+', ' ', t)
+    return re.sub(r'\s+', ' ', t).strip()
+
+
+def resolve_measure(text, species):
+    """Map what the researcher typed to a measure the model actually knows.
+
+    Exact match first, then the alias table, then a token-overlap search that
+    only accepts a clear winner. Ambiguity is returned rather than guessed at,
+    because silently choosing one of several measures would change the animal
+    number without the researcher knowing why.
+
+    Returns (key, how, alternatives).
+    """
+    _load_ovm()
+    if not _OVM:
+        return None, 'unavailable', []
+    sp = (species or 'mouse').strip().lower()
+    known = [m for m in (_OVM_MEASURES or []) if m['species'] == sp]
+    by_name = {m['measure']: m for m in known}
+
+    q = _normalise_measure(text)
+    if not q:
+        return None, 'empty', []
+    if q in by_name:
+        return q, 'exact', []
+
+    alias = _MEASURE_ALIASES.get(q)
+    if alias:
+        if alias in by_name:
+            return alias, 'alias', []
+        q = alias                              # fall through with the long form
+
+    # Token overlap: every word the researcher typed must appear in the
+    # candidate, ranked by how well covered the candidate is and how much data
+    # stands behind it.
+    words = [w for w in q.split() if len(w) > 2]
+    if not words:
+        return None, 'too short', []
+    cands = []
+    for m in known:
+        name = m['measure']
+        if all(w in name for w in words):
+            cands.append((len(name), -m['n_observations'], name))
+    if not cands:
+        return None, 'no match', []
+    cands.sort()
+    best = cands[0][2]
+    alts = [c[2] for c in cands[1:6]]
+    return best, ('unique' if len(cands) == 1 else 'best of several'), alts
+
+
 def predict_outcome_cv(measure, species, strain=None, sex=None):
     """Predicted coefficient of variation (%) for one outcome measure.
 
@@ -2128,9 +2203,14 @@ def predict_outcome_cv(measure, species, strain=None, sex=None):
     _load_ovm()
     if not _OVM or not measure:
         return None
-    key = ((species or 'mouse').strip().lower(), measure.strip().lower())
+    sp = (species or 'mouse').strip().lower()
+    matched, how, alts = resolve_measure(measure, sp)
+    if not matched:
+        return {'in_domain': False, 'measure': measure, 'species': sp,
+                'reason': 'This outcome measure is not in the reference databases.'}
+    key = (sp, matched)
     if key not in _OVM['per_measure']:
-        return {'in_domain': False, 'measure': measure, 'species': key[0],
+        return {'in_domain': False, 'measure': measure, 'species': sp,
                 'reason': 'This outcome measure is not in the reference databases.'}
     try:
         import numpy as np
@@ -2152,6 +2232,7 @@ def predict_outcome_cv(measure, species, strain=None, sex=None):
                       if m['species'] == key[0] and m['measure'] == key[1]), None)
         return {
             'in_domain': True, 'measure': measure, 'species': key[0],
+            'matched_measure': matched, 'match_type': how, 'alternatives': alts,
             'cv_pct': round(cv, 1), 'measure_median_cv_pct': round(base, 1),
             'n_reference_observations': n_obs,
             'model': (_OVM_META or {}).get('name', 'Outcome Variability Model'),

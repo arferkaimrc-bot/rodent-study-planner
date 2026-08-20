@@ -2344,14 +2344,15 @@
                                         <span style="font-weight:400;font-size:.85rem;color:var(--muted);">· d = ${result.sample_size_basis.effect_size_d} · 80% power · &alpha; 0.05</span>
                                     </div>
                                     <div class="stile-sub">
-                                        Predicted variability for <strong>${result.sample_size_basis.variability.measure}</strong>:
+                                        Predicted variability for <strong>${result.sample_size_basis.variability.matched_measure || result.sample_size_basis.variability.measure}</strong>${(result.sample_size_basis.variability.matched_measure && result.sample_size_basis.variability.match_type !== 'exact') ? ` <span style="color:var(--muted);">(matched from &ldquo;${result.sample_size_basis.variability.measure}&rdquo;)</span>` : ''}:
                                         CV ${result.sample_size_basis.variability.cv_pct}%
                                         (measure median ${result.sample_size_basis.variability.measure_median_cv_pct}%,
                                         from ${result.sample_size_basis.variability.n_reference_observations} published measurements).
                                         <span style="color:var(--info);font-weight:600;">🤖 ${result.sample_size_basis.variability.model}</span>
                                         — held-out MAE ${result.sample_size_basis.variability.test_mae_cv_points} CV points.
                                     </div>
-                                    <div class="stile-sub">Sources: ${(result.sample_size_basis.variability.sources || []).join(' · ')}</div>`
+                                    <div class="stile-sub">Sources: ${(result.sample_size_basis.variability.sources || []).join(' · ')}</div>
+                                    ${(result.sample_size_basis.variability.alternatives || []).length ? `<div class="stile-sub" style="color:#8a5a12;">Other measures also matched what you typed — pick one explicitly if this is not the right endpoint: ${result.sample_size_basis.variability.alternatives.slice(0,3).join(' · ')}</div>` : ''}`
                                     : `
                                     <div class="stile-value" style="font-size:1rem;color:#64748b;">
                                         ${result.sample_size_basis.n_per_group} per group
